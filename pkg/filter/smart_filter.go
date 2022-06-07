@@ -5,6 +5,7 @@ import (
 	"crawlergo/pkg/logger"
 	"crawlergo/pkg/model"
 	"crawlergo/pkg/tools"
+	"fmt"
 	"go/types"
 	"regexp"
 	"sort"
@@ -175,7 +176,12 @@ func (s *SmartFilter) getMark(req *model.Request) {
 	queryMap := todoURL.QueryMap()
 	queryMap = s.markParamName(queryMap)
 	queryMap = s.markParamValue(queryMap, *req)
-	markedPath := s.MarkPath(todoURL.Path)
+	var markedPath string
+	if todoURL.Fragment != "" && strings.HasPrefix(todoURL.Fragment, "/") {
+		markedPath = s.MarkPath(fmt.Sprintf("%s#%s", todoURL.Path, todoURL.Fragment))
+	} else {
+		markedPath = s.MarkPath(todoURL.Path)
+	}
 
 	// 计算唯一的ID
 	var queryKeyID string
@@ -207,7 +213,12 @@ func (s *SmartFilter) postMark(req *model.Request) {
 
 	postDataMap = s.markParamName(postDataMap)
 	postDataMap = s.markParamValue(postDataMap, *req)
-	markedPath := s.MarkPath(req.URL.Path)
+	var markedPath string
+	if req.URL.Fragment != "" && strings.HasPrefix(req.URL.Fragment, "/") {
+		markedPath = s.MarkPath(fmt.Sprintf("%s#%s", req.URL.Path, req.URL.Fragment))
+	} else {
+		markedPath = s.MarkPath(req.URL.Path)
+	}
 
 	// 计算唯一的ID
 	var postDataMapID string
@@ -573,9 +584,6 @@ func (s *SmartFilter) getMarkedUniqueID(req *model.Request) string {
 		uniqueStr += "https"
 	}
 
-	if req.URL.Fragment != "" && strings.HasPrefix(req.URL.Fragment, "/") {
-		uniqueStr += req.URL.Fragment
-	}
 	return tools.StrMd5(uniqueStr)
 }
 

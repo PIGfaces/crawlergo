@@ -9,10 +9,15 @@ require (
 	github.com/chromedp/chromedp v0.5.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
+	github.com/go-redis/redis/extra/redisotel v0.3.0
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gogf/gf v1.16.6
+	github.com/google/uuid v1.3.0
+	github.com/google/wire v0.5.0
 	github.com/panjf2000/ants/v2 v2.2.2
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
+	github.com/stretchr/testify v1.7.0
 	github.com/urfave/cli/v2 v2.0.0
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
 )

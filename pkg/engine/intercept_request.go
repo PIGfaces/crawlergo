@@ -9,14 +9,15 @@ import (
 	"crawlergo/pkg/tools"
 	"crawlergo/pkg/tools/requests"
 	"encoding/base64"
-	"github.com/chromedp/cdproto/fetch"
-	"github.com/chromedp/cdproto/network"
 	"io"
 	"net/textproto"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/chromedp/cdproto/fetch"
+	"github.com/chromedp/cdproto/network"
 )
 
 /**
@@ -208,7 +209,7 @@ func (tab *Tab) ParseResponseURL(v *network.EventResponseReceived) {
 
 		url = url[1 : len(url)-1]
 		url_lower := strings.ToLower(url)
-		if strings.HasPrefix(url_lower, "image/x-icon") || strings.HasPrefix(url_lower, "text/css") || strings.HasPrefix(url_lower, "text/javascript") {
+		if isContentType(url_lower) {
 			continue
 		}
 
@@ -293,4 +294,28 @@ func ConvertHeadersNoLocation(h map[string][]string) []*fetch.HeaderEntry {
 		headers = append(headers, &header)
 	}
 	return headers
+}
+
+// isContentType 判断是否为 content Type 类型， 过滤掉这类拼接错误的 url
+func isContentType(url string) bool {
+
+	contentTypes := []string{
+		"image/x-icon",
+		"text/css",
+		"text/javascript",
+		"text/html",
+		"text/xml",
+		"text/plain",
+		"application/json",
+		"application/x-www-form-urlencoded",
+		"application/json",
+		"multipart/form-data",
+	}
+
+	for _, value := range contentTypes {
+		if strings.HasPrefix(url, value) {
+			return true
+		}
+	}
+	return false
 }

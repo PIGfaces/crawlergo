@@ -8,6 +8,11 @@ import (
 	model2 "crawlergo/pkg/model"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/fetch"
@@ -16,10 +21,6 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/gogf/gf/encoding/gcharset"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Tab struct {
@@ -33,7 +34,7 @@ type Tab struct {
 	NavNetworkID     string
 	PageCharset      string
 	PageBindings     map[string]interface{}
-	NavDone          chan int
+	NavDone          chan struct{}
 	FoundRedirection bool
 	DocBodyNodeId    cdp.NodeID
 	config           TabConfig
@@ -81,7 +82,7 @@ func NewTab(browser *Browser, navigateReq model2.Request, config TabConfig) *Tab
 	}
 	tab.NavigateReq = navigateReq
 	tab.config = config
-	tab.NavDone = make(chan int)
+	tab.NavDone = make(chan struct{})
 	tab.DocBodyNodeId = 0
 
 	// 设置请求拦截监听
@@ -230,7 +231,7 @@ func (tab *Tab) Start() {
 	go func() {
 		// 等待所有协程任务结束
 		tab.WG.Wait()
-		tab.NavDone <- 1
+		tab.NavDone <- struct{}{}
 	}()
 
 	select {
@@ -303,6 +304,8 @@ func (tab *Tab) AddResultUrl(method string, _url string, source string) {
 	}
 	req := model2.GetRequest(method, url, option)
 	req.Source = source
+	// 继承任务ID
+	req.TaskID = tab.NavigateReq.TaskID
 
 	tab.lock.Lock()
 	tab.ResultList = append(tab.ResultList, &req)
@@ -317,6 +320,9 @@ func (tab *Tab) AddResultRequest(req model2.Request) {
 		req.Headers[key] = value
 	}
 	tab.lock.Lock()
+
+	// 继承任务ID
+	req.TaskID = tab.NavigateReq.TaskID
 	tab.ResultList = append(tab.ResultList, &req)
 	tab.lock.Unlock()
 }

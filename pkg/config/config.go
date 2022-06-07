@@ -28,6 +28,14 @@ const (
 	OPTIONS = "OPTIONS"
 )
 
+// 结果保存的文件
+const (
+	REQUEST_FILE     = "req_list.txt"
+	ALL_REQUEST_FILE = "all_req_list.txt"
+	ALL_DOMAIN_FILE  = "all_domain_list.txt"
+	SUB_DOMAIN_FILE  = "sub_domain_list.txt"
+)
+
 // 过滤模式
 const (
 	SimpleFilterMode = "simple"

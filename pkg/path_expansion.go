@@ -73,6 +73,7 @@ func GetPathsFromRobots(navReq model2.Request) []*model2.Request {
 		}
 		req := model2.GetRequest(config.GET, url)
 		req.Source = config.FromRobots
+		req.TaskID = navReq.TaskID
 		result = append(result, &req)
 	}
 	return result
@@ -132,6 +133,7 @@ func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 		}
 		req := model2.GetRequest(config.GET, url)
 		req.Source = config.FromFuzz
+		req.TaskID = navReq.TaskID
 		result = append(result, &req)
 	}
 	return result

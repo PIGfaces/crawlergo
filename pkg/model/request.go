@@ -27,6 +27,7 @@ type Options struct {
 }
 
 type Request struct {
+	TaskID          string // 所属的任务ID
 	URL             *URL
 	Method          string
 	Headers         map[string]interface{}

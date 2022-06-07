@@ -1,12 +1,16 @@
 package pkg
 
 import (
+	"crawlergo/internal/biz"
 	"crawlergo/pkg/config"
 	engine2 "crawlergo/pkg/engine"
 	filter2 "crawlergo/pkg/filter"
 	"crawlergo/pkg/logger"
 	"crawlergo/pkg/model"
+	"crawlergo/pkg/resultsave"
+	taskPkg "crawlergo/pkg/task"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"time"
 
@@ -14,24 +18,27 @@ import (
 )
 
 type CrawlerTask struct {
-	Browser       *engine2.Browser    //
-	RootDomain    string              // 当前爬取根域名 用于子域名收集
-	Targets       []*model.Request    // 输入目标
-	Result        *Result             // 最终结果
-	Config        *TaskConfig         // 配置信息
+	Browser       *engine2.Browser //
+	RootDomain    string           // 当前爬取根域名 用于子域名收集
+	Targets       []*model.Request // 输入目标
+	Result        *Result          // 最终结果
+	ResultSave    resultsave.ResultSave
+	Config        *taskPkg.TaskConfig // 配置信息
 	smartFilter   filter2.SmartFilter // 过滤对象
 	Pool          *ants.Pool          // 协程池
 	taskWG        sync.WaitGroup      // 等待协程池所有任务结束
 	crawledCount  int                 // 爬取过的数量
 	taskCountLock sync.Mutex          // 已爬取的任务总数锁
+	redisUsecase  *biz.EngineUsecase  // 跟 redis 交互的接口
 }
 
 type Result struct {
-	ReqList       []*model.Request // 返回的同域名结果
-	AllReqList    []*model.Request // 所有域名的请求
-	AllDomainList []string         // 所有域名列表
-	SubDomainList []string         // 子域名列表
-	resultLock    sync.Mutex       // 合并结果时加锁
+	AllReqSimpFilter *filter2.SimpleFilter
+	ReqSave          resultsave.ResultSave
+	AllReqSave       resultsave.ResultSave
+	allDomainSave    resultsave.ResultSave
+	subDomainSave    resultsave.ResultSave
+	resultLock       sync.Mutex // 合并结果时加锁
 }
 
 type TaskConfig struct {
@@ -64,21 +71,45 @@ type tabTask struct {
 	crawlerTask *CrawlerTask
 	browser     *engine2.Browser
 	req         *model.Request
-	pool        *ants.Pool
 }
 
 /**
 新建爬虫任务
 */
-func NewCrawlerTask(targets []*model.Request, taskConf TaskConfig) (*CrawlerTask, error) {
+func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string) (*CrawlerTask, error) {
+
+	var (
+		CSPEngineuc  *biz.EngineUsecase
+		redisTargets []*model.Request
+		taskResult   = &Result{
+			AllReqSimpFilter: &filter2.SimpleFilter{},
+		}
+		targets = []*model.Request{}
+	)
+	// redis 中的任务
+	if taskConf.RedisConnectInfo != "" {
+		redisTargets, CSPEngineuc = GetRedisTarget(taskConf, postData)
+		targets = append(targets, redisTargets...)
+	}
+	// 命令行的参数任务
+	targets = append(targets, MakeTargets(urls, taskConf, postData)...)
+
+	if taskConf.OutputJsonPath != "" {
+		taskResult.AllReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_REQUEST_FILE))
+		taskResult.ReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.REQUEST_FILE))
+		taskResult.allDomainSave = resultsave.NewAllDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_DOMAIN_FILE))
+		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), targets[0].URL.RootDomain())
+	}
+
 	crawlerTask := CrawlerTask{
-		Result: &Result{},
+		Result: taskResult,
 		Config: &taskConf,
 		smartFilter: filter2.SmartFilter{
 			SimpleFilter: filter2.SimpleFilter{
 				HostLimit: targets[0].URL.Host,
 			},
 		},
+		redisUsecase: CSPEngineuc,
 	}
 
 	if len(targets) == 1 {
@@ -99,40 +130,28 @@ func NewCrawlerTask(targets []*model.Request, taskConf TaskConfig) (*CrawlerTask
 		req.Source = config.FromTarget
 	}
 
-	if taskConf.TabRunTimeout == 0 {
-		taskConf.TabRunTimeout = config.TabRunTimeout
+	if len(targets) == 0 {
+		logger.Logger.Fatal("no validate target.")
 	}
+	logger.Logger.Info(fmt.Sprintf("Init crawler task, host: %s, max tab count: %d, max crawl count: %d.",
+		targets[0].URL.Host, taskConf.MaxTabsCount, taskConf.MaxCrawlCount))
+	logger.Logger.Info("filter mode: ", taskConf.FilterMode)
 
-	if taskConf.MaxTabsCount == 0 {
-		taskConf.MaxTabsCount = config.MaxTabsCount
-	}
+	// 业务代码与数据代码分离, 初始化一些默认配置
+	taskConf.SetConf(
+		taskPkg.WithTabRunTimeout(config.TabRunTimeout),
+		taskPkg.WithMaxTabsCount(config.MaxTabsCount),
+		taskPkg.WithMaxCrawlCount(config.MaxCrawlCount),
+		taskPkg.WithDomContentLoadedTimeout(config.DomContentLoadedTimeout),
+		taskPkg.WithEventTriggerInterval(config.EventTriggerInterval),
+		taskPkg.WithBeforeExitDelay(config.BeforeExitDelay),
+		taskPkg.WithEventTriggerMode(config.DefaultEventTriggerMode),
+		taskPkg.WithIgnoreKeywords(config.DefaultIgnoreKeywords),
+	)
 
-	if taskConf.FilterMode == config.StrictFilterMode {
-		crawlerTask.smartFilter.StrictMode = true
-	}
-
-	if taskConf.MaxCrawlCount == 0 {
-		taskConf.MaxCrawlCount = config.MaxCrawlCount
-	}
-
-	if taskConf.DomContentLoadedTimeout == 0 {
-		taskConf.DomContentLoadedTimeout = config.DomContentLoadedTimeout
-	}
-
-	if taskConf.EventTriggerInterval == 0 {
-		taskConf.EventTriggerInterval = config.EventTriggerInterval
-	}
-
-	if taskConf.BeforeExitDelay == 0 {
-		taskConf.BeforeExitDelay = config.BeforeExitDelay
-	}
-
-	if taskConf.EventTriggerMode == "" {
-		taskConf.EventTriggerMode = config.DefaultEventTriggerMode
-	}
-
-	if len(taskConf.IgnoreKeywords) == 0 {
-		taskConf.IgnoreKeywords = config.DefaultIgnoreKeywords
+	if taskConf.MaxCrawlCount < len(crawlerTask.Targets) {
+		// 如果最大爬取数量都少于任务数量就会不完整了
+		taskConf.MaxCrawlCount = len(crawlerTask.Targets) * 100
 	}
 
 	if taskConf.ExtraHeadersString != "" {
@@ -192,16 +211,18 @@ func (t *CrawlerTask) Run() {
 		t.Targets = append(t.Targets, reqsByFuzz...)
 	}
 
-	t.Result.AllReqList = t.Targets[:]
-
 	var initTasks []*model.Request
 	for _, req := range t.Targets {
+		// 保存所有任务结果
+		t.SaveAllReqInfo(req)
+
 		if t.smartFilter.DoFilter(req) {
 			logger.Logger.Debugf("filter req: " + req.URL.RequestURI())
 			continue
 		}
 		initTasks = append(initTasks, req)
-		t.Result.ReqList = append(t.Result.ReqList, req)
+		// 保存有效的请求任务信息
+		t.SaveReqResult(req)
 	}
 	logger.Logger.Info("filter repeat, target count: ", len(initTasks))
 
@@ -212,25 +233,11 @@ func (t *CrawlerTask) Run() {
 	}
 
 	t.taskWG.Wait()
+	t.Result.Close()
+	// for index := range t.Result.AllReqList {
+	// 	todoFilterAll[index] = t.Result.AllReqList[index]
+	// }
 
-	// 对全部请求进行唯一去重
-	todoFilterAll := make([]*model.Request, len(t.Result.AllReqList))
-	for index := range t.Result.AllReqList {
-		todoFilterAll[index] = t.Result.AllReqList[index]
-	}
-
-	t.Result.AllReqList = []*model.Request{}
-	var simpleFilter filter2.SimpleFilter
-	for _, req := range todoFilterAll {
-		if !simpleFilter.UniqueFilter(req) {
-			t.Result.AllReqList = append(t.Result.AllReqList, req)
-		}
-	}
-
-	// 全部域名
-	t.Result.AllDomainList = AllDomainCollect(t.Result.AllReqList)
-	// 子域名
-	t.Result.SubDomainList = SubDomainCollect(t.Result.AllReqList, t.RootDomain)
 }
 
 /**
@@ -278,14 +285,18 @@ func (t *tabTask) Task() {
 
 	// 收集结果
 	t.crawlerTask.Result.resultLock.Lock()
-	t.crawlerTask.Result.AllReqList = append(t.crawlerTask.Result.AllReqList, tab.ResultList...)
+	// 保存所有结果，包括域名
+	for _, req := range tab.ResultList {
+		t.crawlerTask.SaveAllReqInfo(req)
+	}
 	t.crawlerTask.Result.resultLock.Unlock()
 
 	for _, req := range tab.ResultList {
 		if t.crawlerTask.Config.FilterMode == config.SimpleFilterMode {
 			if !t.crawlerTask.smartFilter.SimpleFilter.DoFilter(req) {
 				t.crawlerTask.Result.resultLock.Lock()
-				t.crawlerTask.Result.ReqList = append(t.crawlerTask.Result.ReqList, req)
+				// 保存有效请求结果
+				t.crawlerTask.SaveReqResult(req)
 				t.crawlerTask.Result.resultLock.Unlock()
 				if !engine2.IsIgnoredByKeywordMatch(*req, t.crawlerTask.Config.IgnoreKeywords) {
 					t.crawlerTask.addTask2Pool(req)
@@ -294,12 +305,139 @@ func (t *tabTask) Task() {
 		} else {
 			if !t.crawlerTask.smartFilter.DoFilter(req) {
 				t.crawlerTask.Result.resultLock.Lock()
-				t.crawlerTask.Result.ReqList = append(t.crawlerTask.Result.ReqList, req)
+				// 保存有效请求结果
+				t.crawlerTask.SaveReqResult(req)
 				t.crawlerTask.Result.resultLock.Unlock()
 				if !engine2.IsIgnoredByKeywordMatch(*req, t.crawlerTask.Config.IgnoreKeywords) {
 					t.crawlerTask.addTask2Pool(req)
 				}
 			}
 		}
+	}
+	tab.ResultList = nil
+}
+
+func getOption(postData string, taskConfig taskPkg.TaskConfig) model.Options {
+	var option model.Options
+	if postData != "" {
+		option.PostData = postData
+	}
+	if taskConfig.ExtraHeadersString != "" {
+		err := json.Unmarshal([]byte(taskConfig.ExtraHeadersString), &taskConfig.ExtraHeaders)
+		if err != nil {
+			logger.Logger.Fatal("custom headers can't be Unmarshal.")
+			panic(err)
+		}
+		option.Headers = taskConfig.ExtraHeaders
+	}
+	return option
+}
+
+// newReqForUrl 根据 url 和配置构造任务信息
+func newReqForUrl(targetUrl string, taskConf taskPkg.TaskConfig, postData string) *model.Request {
+	var req model.Request
+	url, err := model.GetUrl(targetUrl)
+	if err != nil {
+		logger.Logger.Error("parse url failed, ", err)
+		return nil
+	}
+	if postData != "" {
+		req = model.GetRequest(config.POST, url, getOption(postData, taskConf))
+	} else {
+		req = model.GetRequest(config.GET, url, getOption(postData, taskConf))
+	}
+	req.Proxy = taskConf.Proxy
+	return &req
+}
+
+func MakeTargets(urls []string, taskConf taskPkg.TaskConfig, postData string) []*model.Request {
+	var targets []*model.Request
+	for _, _url := range urls {
+		req := newReqForUrl(_url, taskConf, postData)
+		targets = append(targets, req)
+	}
+	return targets
+}
+
+// GetRedisTarget 从 redis 中获取任务信息
+func GetRedisTarget(taskConf taskPkg.TaskConfig, postData string) ([]*model.Request, *biz.EngineUsecase) {
+	var targets []*model.Request
+	enguc := wireRedisCacheRepo(taskConf)
+	tasks := enguc.GetTasks()
+	for _, t := range tasks {
+		req := newReqForUrl(t.Url, taskConf, postData)
+		// TODO: set id
+		req.TaskID = t.ID
+		targets = append(targets, req)
+	}
+	return targets, enguc
+}
+
+// SaveAllReqInfo 保存域名结果、爬虫请求结果
+func (t *CrawlerTask) SaveAllReqInfo(req *model.Request) {
+	var wg sync.WaitGroup
+	wg.Add(3)
+	// 结果保存
+	go func() {
+		// 保存所有结果
+		defer wg.Done()
+		if t.Result.AllReqSave == nil || t.Result.AllReqSimpFilter.DoFilter(req) {
+			return
+		}
+		t.Result.AllReqSave.Save(req)
+	}()
+
+	// 全部域名保存
+	go func() {
+		defer wg.Done()
+		if t.Result.allDomainSave != nil {
+			t.Result.allDomainSave.Save(req)
+		}
+	}()
+
+	// 子域名保存
+	go func() {
+		defer wg.Done()
+		if t.Result.subDomainSave != nil {
+			t.Result.subDomainSave.Save(req)
+		}
+	}()
+	wg.Wait()
+}
+
+// SaveReqResult 保存有效的请求结果
+func (t *CrawlerTask) SaveReqResult(req *model.Request) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		if t.Result.ReqSave != nil {
+			t.Result.ReqSave.Save(req)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if t.redisUsecase != nil {
+			t.redisUsecase.SetTaskResult(req)
+		}
+	}()
+	wg.Wait()
+}
+
+func (r *Result) Close() {
+	r.resultLock.Lock()
+	defer r.resultLock.Unlock()
+	if r.allDomainSave != nil {
+		r.allDomainSave.Close()
+	}
+	if r.subDomainSave != nil {
+		r.subDomainSave.Close()
+	}
+	if r.ReqSave != nil {
+		r.ReqSave.Close()
+	}
+	if r.AllReqSave != nil {
+		r.AllReqSave.Close()
 	}
 }

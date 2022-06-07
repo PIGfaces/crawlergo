@@ -9,16 +9,16 @@ import (
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+	letterIdxBits = 6                          // 6 bits to represent a letter index
+	letterIdxMask = 1<<uint(letterIdxBits) - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits         // # of letter indices fitting in 63 bits
 )
 
 const letterBytesLower = "abcdefghijklmnopqrstuvwxyz0123456789"
 const (
-	letterIdxBitsLower = 6                         // 6 bits to represent a letter index
-	letterIdxMaskLower = 1<<letterIdxBitsLower - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMaxLower  = 63 / letterIdxBitsLower   // # of letter indices fitting in 63 bits
+	letterIdxBitsLower = 6                               // 6 bits to represent a letter index
+	letterIdxMaskLower = 1<<uint(letterIdxBitsLower) - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMaxLower  = 63 / letterIdxBitsLower         // # of letter indices fitting in 63 bits
 )
 
 var src = rand.NewSource(time.Now().UnixNano())
@@ -36,7 +36,7 @@ func RandSeq(n int) string {
 			sb.WriteByte(letterBytes[idx])
 			i--
 		}
-		cache >>= letterIdxBits
+		cache >>= uint(letterIdxBits)
 		remain--
 	}
 
