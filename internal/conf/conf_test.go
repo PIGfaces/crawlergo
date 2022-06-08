@@ -1,10 +1,11 @@
 package conf_test
 
 import (
-	"crawlergo/internal/conf"
-	taskPkg "crawlergo/pkg/task"
 	"testing"
 	"time"
+
+	"github.com/PIGfaces/crawlergo/internal/conf"
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -1,9 +1,10 @@
 package filter
 
 import (
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/model"
 	"testing"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -2,11 +2,12 @@ package resultsave
 
 import (
 	"bufio"
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 )
 
 type (

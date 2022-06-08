@@ -2,11 +2,12 @@ package data_test
 
 import (
 	"context"
-	"crawlergo/internal/conf"
-	"crawlergo/internal/data"
 	"encoding/json"
 	"fmt"
 	"testing"
+
+	"github.com/PIGfaces/crawlergo/internal/conf"
+	"github.com/PIGfaces/crawlergo/internal/data"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

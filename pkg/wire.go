@@ -5,11 +5,11 @@
 package pkg
 
 import (
-	"crawlergo/internal/biz"
-	"crawlergo/internal/conf"
-	"crawlergo/internal/data"
+	"github.com/PIGfaces/crawlergo/internal/biz"
+	"github.com/PIGfaces/crawlergo/internal/conf"
+	"github.com/PIGfaces/crawlergo/internal/data"
 
-	taskPkg "crawlergo/pkg/task"
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 	"github.com/google/wire"
 )
 

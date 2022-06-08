@@ -7,10 +7,10 @@
 package pkg
 
 import (
-	"crawlergo/internal/biz"
-	"crawlergo/internal/conf"
-	"crawlergo/internal/data"
-	"crawlergo/pkg/task"
+	"github.com/PIGfaces/crawlergo/internal/biz"
+	"github.com/PIGfaces/crawlergo/internal/conf"
+	"github.com/PIGfaces/crawlergo/internal/data"
+	"github.com/PIGfaces/crawlergo/pkg/task"
 )
 
 // Injectors from wire.go:

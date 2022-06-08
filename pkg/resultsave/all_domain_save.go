@@ -1,8 +1,8 @@
 package resultsave
 
 import (
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 
 	mapset "github.com/deckarep/golang-set"
 )

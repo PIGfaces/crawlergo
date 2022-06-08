@@ -1,4 +1,4 @@
-module crawlergo
+module github.com/PIGfaces/crawlergo
 
 go 1.12
 

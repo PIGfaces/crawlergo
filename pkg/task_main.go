@@ -1,18 +1,19 @@
 package pkg
 
 import (
-	"crawlergo/internal/biz"
-	"crawlergo/pkg/config"
-	engine2 "crawlergo/pkg/engine"
-	filter2 "crawlergo/pkg/filter"
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
-	"crawlergo/pkg/resultsave"
-	taskPkg "crawlergo/pkg/task"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/PIGfaces/crawlergo/internal/biz"
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	engine2 "github.com/PIGfaces/crawlergo/pkg/engine"
+	filter2 "github.com/PIGfaces/crawlergo/pkg/filter"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/resultsave"
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 
 	"github.com/panjf2000/ants/v2"
 )

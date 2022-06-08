@@ -2,14 +2,16 @@ package biz
 
 import (
 	"context"
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
-	"crawlergo/pkg/tools"
-	"crawlergo/pkg/tools/requests"
 
-	taskPkg "crawlergo/pkg/task"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
+
 	"encoding/json"
 	"fmt"
+
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 )
 
 type Task struct {

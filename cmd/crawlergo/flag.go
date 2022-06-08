@@ -1,8 +1,9 @@
 package main
 
 import (
-	"crawlergo/pkg/config"
 	"fmt"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
 
 	"github.com/urfave/cli/v2"
 )

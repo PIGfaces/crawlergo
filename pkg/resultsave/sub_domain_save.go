@@ -1,9 +1,10 @@
 package resultsave
 
 import (
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
 	"strings"
+
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 )
 
 type SubDomainSave struct {

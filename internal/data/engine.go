@@ -2,9 +2,10 @@ package data
 
 import (
 	"context"
-	"crawlergo/internal/biz"
-	"crawlergo/internal/conf"
 	"time"
+
+	"github.com/PIGfaces/crawlergo/internal/biz"
+	"github.com/PIGfaces/crawlergo/internal/conf"
 )
 
 type EngineRepo struct {

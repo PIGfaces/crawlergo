@@ -1,8 +1,9 @@
 package data
 
 import (
-	"crawlergo/internal/conf"
 	"fmt"
+
+	"github.com/PIGfaces/crawlergo/internal/conf"
 
 	"github.com/go-redis/redis/extra/redisotel"
 	"github.com/go-redis/redis/v8"

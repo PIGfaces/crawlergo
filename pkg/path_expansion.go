@@ -1,15 +1,16 @@
 package pkg
 
 import (
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/logger"
-	model2 "crawlergo/pkg/model"
-	"crawlergo/pkg/tools"
-	"crawlergo/pkg/tools/requests"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	model2 "github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/panjf2000/ants/v2"

@@ -3,11 +3,6 @@ package engine
 import (
 	"bufio"
 	"context"
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/logger"
-	model2 "crawlergo/pkg/model"
-	"crawlergo/pkg/tools"
-	"crawlergo/pkg/tools/requests"
 	"encoding/base64"
 	"io"
 	"net/textproto"
@@ -15,6 +10,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	model2 "github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
 
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"

@@ -1,12 +1,13 @@
 package conf
 
 import (
-	"crawlergo/pkg/logger"
 	"encoding/base64"
 	"encoding/json"
 	"time"
 
-	taskPkg "crawlergo/pkg/task"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 
 	"github.com/google/wire"
 )

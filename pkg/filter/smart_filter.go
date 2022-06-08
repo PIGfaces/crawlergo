@@ -1,16 +1,17 @@
 package filter
 
 import (
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/logger"
-	"crawlergo/pkg/model"
-	"crawlergo/pkg/tools"
 	"fmt"
 	"go/types"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	"github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
 
 	mapset "github.com/deckarep/golang-set"
 )

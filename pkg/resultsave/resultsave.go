@@ -1,6 +1,6 @@
 package resultsave
 
-import "crawlergo/pkg/model"
+import "github.com/PIGfaces/crawlergo/pkg/model"
 
 type ResultSave interface {
 	Save(*model.Request)

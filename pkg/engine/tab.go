@@ -2,16 +2,17 @@ package engine
 
 import (
 	"context"
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/js"
-	"crawlergo/pkg/logger"
-	model2 "crawlergo/pkg/model"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/js"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	model2 "github.com/PIGfaces/crawlergo/pkg/model"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"

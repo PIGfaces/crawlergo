@@ -1,12 +1,6 @@
 package main
 
 import (
-	"crawlergo/pkg"
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/logger"
-	model2 "crawlergo/pkg/model"
-	"crawlergo/pkg/tools"
-	"crawlergo/pkg/tools/requests"
 	"errors"
 	"fmt"
 	"os"
@@ -14,11 +8,18 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/PIGfaces/crawlergo/pkg"
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/logger"
+	model2 "github.com/PIGfaces/crawlergo/pkg/model"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
+
 	"github.com/panjf2000/ants/v2"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	taskPkg "crawlergo/pkg/task"
+	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
 )
 
 /**

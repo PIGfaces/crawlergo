@@ -1,13 +1,14 @@
 package model
 
 import (
-	"crawlergo/pkg/config"
-	"crawlergo/pkg/tools"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
 )
 
 type Filter struct {
