@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/PIGfaces/crawlergo/pkg"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -51,18 +52,20 @@ type ProxyTask struct {
 const DefaultMaxPushProxyPoolMax = 10
 const DefaultLogLevel = "Info"
 
-var taskConfig taskPkg.TaskConfig
-var outputMode string
-var postData string
-var signalChan chan os.Signal
-var ignoreKeywords *cli.StringSlice
-var customFormTypeValues *cli.StringSlice
-var customFormKeywordValues *cli.StringSlice
-var pushAddress string
-var pushProxyPoolMax int
-var pushProxyWG sync.WaitGroup
-var outputJsonPath string
-var logLevel string
+var (
+	taskConfig              taskPkg.TaskConfig
+	outputMode              string
+	postData                string
+	signalChan              chan os.Signal
+	ignoreKeywords          *cli.StringSlice
+	customFormTypeValues    *cli.StringSlice
+	customFormKeywordValues *cli.StringSlice
+	pushAddress             string
+	pushProxyPoolMax        int
+	pushProxyWG             sync.WaitGroup
+	logLevel                string
+	Version                 string
+)
 
 func main() {
 	author := cli.Author{
@@ -80,38 +83,10 @@ func main() {
 		Name:      "crawlergo",
 		Usage:     "A powerful browser crawler for web vulnerability scanners",
 		UsageText: "crawlergo [global options] url1 url2 url3 ... (must be same host)",
-		Version:   "v0.4.2",
+		Version:   Version,
 		Authors:   []*cli.Author{&author},
-		Flags: []cli.Flag{
-			SetChromePath(),
-			SetCustomHeaders(),
-			SetPostData(),
-			SetMaxCrawledCount(),
-			SetFilterMod(),
-			// SetOutputMode(),
-			SetOutputJSON(),
-			SetIgcognitoContext(),
-			SetMaxTabCount(),
-			SetFuzzPath(),
-			SetFuzzPathDict(),
-			SetRobotsPath(),
-			SetRequestProxy(),
-			SetEncodeURL(),
-			SetTabRunTTL(),
-			SetWaitDomContentLoadedTTL(),
-			SetEventTriggerMode(),
-			SetEventTriggerInterval(),
-			SetBeforeExitDelay(),
-			SetIgnoreUrlKeywords(),
-			SetFormValues(),
-			SetFormKeywordValue(),
-			SetPushToProxy(),
-			SetPushPoolMax(),
-			SetLogLevel(),
-			SetNoHeadless(),
-			SetRedis(),
-		},
-		Action: run,
+		Flags:     cliFlags,
+		Action:    run,
 	}
 
 	err := app.Run(os.Args)
@@ -122,7 +97,7 @@ func main() {
 
 func run(c *cli.Context) error {
 	signalChan = make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 
 	if c.Args().Len() == 0 && taskConfig.RedisConnectInfo == "" {
 		// if c.Args().Len() == 0 {
@@ -249,13 +224,11 @@ func (p *ProxyTask) doRequest() {
 }
 
 func handleExit(t *pkg.CrawlerTask) {
-	select {
-	case <-signalChan:
-		fmt.Println("exit ...")
-		t.Pool.Tune(1)
-		t.Pool.Release()
-		t.Browser.Close()
-		t.Result.Close()
-		os.Exit(-1)
-	}
+	<-signalChan
+	fmt.Println("exit ...")
+	t.Pool.Tune(1)
+	t.Pool.Release()
+	t.Browser.Close()
+	t.Result.Close()
+	os.Exit(-1)
 }

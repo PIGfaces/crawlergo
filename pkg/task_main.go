@@ -139,7 +139,7 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 	logger.Logger.Info("filter mode: ", taskConf.FilterMode)
 
 	// 业务代码与数据代码分离, 初始化一些默认配置
-	taskConf.SetConf(
+	for _, fn := range []taskPkg.TaskConfigOptFunc{
 		taskPkg.WithTabRunTimeout(config.TabRunTimeout),
 		taskPkg.WithMaxTabsCount(config.MaxTabsCount),
 		taskPkg.WithMaxCrawlCount(config.MaxCrawlCount),
@@ -148,7 +148,9 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		taskPkg.WithBeforeExitDelay(config.BeforeExitDelay),
 		taskPkg.WithEventTriggerMode(config.DefaultEventTriggerMode),
 		taskPkg.WithIgnoreKeywords(config.DefaultIgnoreKeywords),
-	)
+	} {
+		fn(&taskConf)
+	}
 
 	if taskConf.MaxCrawlCount < len(crawlerTask.Targets) {
 		// 如果最大爬取数量都少于任务数量就会不完整了

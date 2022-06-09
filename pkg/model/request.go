@@ -20,6 +20,7 @@ type Filter struct {
 	MarkedPath        string
 	PathId            string
 	UniqueId          string
+	FragmentID        string
 }
 
 type Options struct {

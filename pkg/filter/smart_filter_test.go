@@ -26,8 +26,8 @@ var (
 func TestMarkPath(t *testing.T) {
 	// 测试实例
 
-	baseUrlMarkResult := smart.MarkPath(baseUri)
-	sameUrlMarkResult := smart.MarkPath(sameUri)
+	baseUrlMarkResult := MarkPath(baseUri)
+	sameUrlMarkResult := MarkPath(sameUri)
 
 	t.Log("mark path result: ", baseUrlMarkResult)
 	assert.Equal(t, baseUrlMarkResult, sameUrlMarkResult)
@@ -40,10 +40,10 @@ func TestMarkPathForFragment(t *testing.T) {
 	fragmentSimpleReq := getRequest(t, fragmentSimpleUri)
 	fragmentMultWordReq := getRequest(t, fragmentMultWordUri)
 
-	t.Log("\nfragment URL: ", baseReq.URL.Fragment, "\tMarked: ", smart.MarkPath(baseReq.URL.Fragment))
-	t.Log("\nsame multi word at fragment: ", fragmentSimpleReq.URL.Fragment, "\tMarked: ", smart.MarkPath(fragmentSimpleReq.URL.Fragment))
-	assert.Equal(t, smart.MarkPath(baseReq.URL.Fragment), smart.MarkPath(sameReq.URL.Fragment))
-	assert.Equal(t, smart.MarkPath(fragmentSimpleReq.URL.Fragment), smart.MarkPath(fragmentMultWordReq.URL.Fragment))
+	t.Log("\nfragment URL: ", baseReq.URL.Fragment, "\tMarked: ", MarkPath(baseReq.URL.Fragment))
+	t.Log("\nsame multi word at fragment: ", fragmentSimpleReq.URL.Fragment, "\tMarked: ", MarkPath(fragmentSimpleReq.URL.Fragment))
+	assert.Equal(t, MarkPath(baseReq.URL.Fragment), MarkPath(sameReq.URL.Fragment))
+	assert.Equal(t, MarkPath(fragmentSimpleReq.URL.Fragment), MarkPath(fragmentMultWordReq.URL.Fragment))
 }
 
 func TestDoFilter(t *testing.T) {
@@ -91,7 +91,7 @@ func TestGetPathID(t *testing.T) {
 	sameUrl, err := model.GetUrl(sameUri)
 	assert.Nil(t, err)
 
-	assert.Equal(t, smart.getPathID(baseUrl.Path), smart.getPathID(sameUrl.Path))
+	assert.Equal(t, getPathID(baseUrl.Path), getPathID(sameUrl.Path))
 }
 
 func TestGetMark(t *testing.T) {

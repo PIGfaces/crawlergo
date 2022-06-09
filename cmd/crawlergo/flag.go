@@ -8,6 +8,36 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var cliFlags = []cli.Flag{
+	SetChromePath(),
+	SetCustomHeaders(),
+	SetPostData(),
+	SetMaxCrawledCount(),
+	SetFilterMod(),
+	// SetOutputMode(),
+	SetOutputJSON(),
+	SetIgcognitoContext(),
+	SetMaxTabCount(),
+	SetFuzzPath(),
+	SetFuzzPathDict(),
+	SetRobotsPath(),
+	SetRequestProxy(),
+	SetEncodeURL(),
+	SetTabRunTTL(),
+	SetWaitDomContentLoadedTTL(),
+	SetEventTriggerMode(),
+	SetEventTriggerInterval(),
+	SetBeforeExitDelay(),
+	SetIgnoreUrlKeywords(),
+	SetFormValues(),
+	SetFormKeywordValue(),
+	SetPushToProxy(),
+	SetPushPoolMax(),
+	SetLogLevel(),
+	SetNoHeadless(),
+	SetRedis(),
+}
+
 func SetChromePath() *cli.PathFlag {
 	return &cli.PathFlag{
 		Name:        "chromium-path",
