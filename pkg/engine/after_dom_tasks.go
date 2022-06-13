@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"os"
 	"strings"
 	"time"
 
@@ -144,13 +143,14 @@ func (f *FillForm) fillInput() {
 		} else if attrType == "radio" || attrType == "checkbox" {
 			var nodeIds = []cdp.NodeID{node.NodeID}
 			_ = chromedp.SetAttributeValue(nodeIds, "checked", "true", chromedp.ByNodeID).Do(tCtxN)
-		} else if attrType == "file" || attrType == "image" {
+		} else if attrType == "file" {
 			var nodeIds = []cdp.NodeID{node.NodeID}
-			wd, _ := os.Getwd()
-			filePath := wd + "/upload/image.png"
+			// wd, _ := os.Getwd()
+			// filePath := wd + "/upload/image.png"
 			_ = chromedp.RemoveAttribute(nodeIds, "accept", chromedp.ByNodeID).Do(tCtxN)
 			_ = chromedp.RemoveAttribute(nodeIds, "required", chromedp.ByNodeID).Do(tCtxN)
-			_ = chromedp.SendKeys(nodeIds, filePath, chromedp.ByNodeID).Do(tCtxN)
+			// _ = chromedp.SendKeys(nodeIds, filePath, chromedp.ByNodeID).Do(tCtxN)
+			_ = chromedp.SetUploadFiles(nodeIds, f.tab.config.UploadFiles, chromedp.ByNodeID).Do(tCtxN)
 		}
 		cancelN()
 	}

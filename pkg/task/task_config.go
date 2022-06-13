@@ -30,6 +30,7 @@ type TaskConfig struct {
 	CustomFormValues        map[string]string // 自定义表单填充参数
 	CustomFormKeywordValues map[string]string // 自定义表单关键词填充内容
 	RedisConnectInfo        string            // 通过 redis 进行交互需要的信息
+	UploadFileDir           string
 }
 
 type TaskConfigOptFunc func(*TaskConfig)

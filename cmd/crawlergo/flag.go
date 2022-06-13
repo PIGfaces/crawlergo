@@ -36,6 +36,7 @@ var cliFlags = []cli.Flag{
 	SetLogLevel(),
 	SetNoHeadless(),
 	SetRedis(),
+	SetFileUpload(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -289,5 +290,13 @@ func SetRedis() *cli.StringFlag {
 		Name:        "redis-conninfo",
 		Usage:       "redis connect info, must be a base64 string for object of { \"connection\": { \"host\": \"xx\", \"port\": 6379, \"password\": \"xxx\" }, \"target_db\": 1, \"target_key\": \"xxxx\", \"result_db\": 2}",
 		Destination: &taskConfig.RedisConnectInfo,
+	}
+}
+
+func SetFileUpload() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:        "static-file",
+		Usage:       "auto upload file for form submit",
+		Destination: &taskConfig.UploadFileDir,
 	}
 }

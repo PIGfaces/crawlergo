@@ -62,6 +62,7 @@ type TabConfig struct {
 	Proxy                   string
 	CustomFormValues        map[string]string
 	CustomFormKeywordValues map[string]string
+	UploadFiles             []string
 }
 
 type bindingCallPayload struct {

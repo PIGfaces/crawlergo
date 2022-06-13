@@ -16,6 +16,7 @@ const (
 	BeforeExitDelay         = 1 * time.Second
 	DefaultEventTriggerMode = EventTriggerAsync
 	MaxCrawlCount           = 200
+	UploadFileSizeLimited   = 10 * 1024 * 1024
 )
 
 // 请求方法

@@ -3,8 +3,11 @@ package pkg
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/PIGfaces/crawlergo/internal/biz"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -18,20 +21,25 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
-type CrawlerTask struct {
-	Browser       *engine2.Browser //
-	RootDomain    string           // 当前爬取根域名 用于子域名收集
-	Targets       []*model.Request // 输入目标
-	Result        *Result          // 最终结果
-	ResultSave    resultsave.ResultSave
-	Config        *taskPkg.TaskConfig // 配置信息
-	smartFilter   filter2.SmartFilter // 过滤对象
-	Pool          *ants.Pool          // 协程池
-	taskWG        sync.WaitGroup      // 等待协程池所有任务结束
-	crawledCount  int                 // 爬取过的数量
-	taskCountLock sync.Mutex          // 已爬取的任务总数锁
-	redisUsecase  *biz.EngineUsecase  // 跟 redis 交互的接口
-}
+type (
+	CrawlerTask struct {
+		Browser       *engine2.Browser //
+		RootDomain    string           // 当前爬取根域名 用于子域名收集
+		Targets       []*model.Request // 输入目标
+		Result        *Result          // 最终结果
+		ResultSave    resultsave.ResultSave
+		Config        *taskPkg.TaskConfig // 配置信息
+		smartFilter   filter2.SmartFilter // 过滤对象
+		Pool          *ants.Pool          // 协程池
+		UploadFiles   []string
+		taskWG        sync.WaitGroup     // 等待协程池所有任务结束
+		crawledCount  int                // 爬取过的数量
+		taskCountLock sync.Mutex         // 已爬取的任务总数锁
+		redisUsecase  *biz.EngineUsecase // 跟 redis 交互的接口
+	}
+
+	CrawlergoOptFunc func(*CrawlerTask)
+)
 
 type Result struct {
 	AllReqSimpFilter *filter2.SimpleFilter
@@ -40,32 +48,6 @@ type Result struct {
 	allDomainSave    resultsave.ResultSave
 	subDomainSave    resultsave.ResultSave
 	resultLock       sync.Mutex // 合并结果时加锁
-}
-
-type TaskConfig struct {
-	MaxCrawlCount           int    // 最大爬取的数量
-	FilterMode              string // simple、smart、strict
-	ExtraHeaders            map[string]interface{}
-	ExtraHeadersString      string
-	AllDomainReturn         bool // 全部域名收集
-	SubDomainReturn         bool // 子域名收集
-	IncognitoContext        bool // 开启隐身模式
-	NoHeadless              bool // headless模式
-	DomContentLoadedTimeout time.Duration
-	TabRunTimeout           time.Duration     // 单个标签页超时
-	PathByFuzz              bool              // 通过字典进行Path Fuzz
-	FuzzDictPath            string            //Fuzz目录字典
-	PathFromRobots          bool              // 解析Robots文件找出路径
-	MaxTabsCount            int               // 允许开启的最大标签页数量 即同时爬取的数量
-	ChromiumPath            string            // Chromium的程序路径  `/home/zhusiyu1/chrome-linux/chrome`
-	EventTriggerMode        string            // 事件触发的调用方式： 异步 或 顺序
-	EventTriggerInterval    time.Duration     // 事件触发的间隔
-	BeforeExitDelay         time.Duration     // 退出前的等待时间，等待DOM渲染，等待XHR发出捕获
-	EncodeURLWithCharset    bool              // 使用检测到的字符集自动编码URL
-	IgnoreKeywords          []string          // 忽略的关键字，匹配上之后将不再扫描且不发送请求
-	Proxy                   string            // 请求代理
-	CustomFormValues        map[string]string // 自定义表单填充参数
-	CustomFormKeywordValues map[string]string // 自定义表单关键词填充内容
 }
 
 type tabTask struct {
@@ -156,6 +138,8 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		// 如果最大爬取数量都少于任务数量就会不完整了
 		taskConf.MaxCrawlCount = len(crawlerTask.Targets) * 100
 	}
+
+	crawlerTask.setUploadFileDir(taskConf.UploadFileDir)
 
 	if taskConf.ExtraHeadersString != "" {
 		err := json.Unmarshal([]byte(taskConf.ExtraHeadersString), &taskConf.ExtraHeaders)
@@ -283,6 +267,7 @@ func (t *tabTask) Task() {
 		IgnoreKeywords:          t.crawlerTask.Config.IgnoreKeywords,
 		CustomFormValues:        t.crawlerTask.Config.CustomFormValues,
 		CustomFormKeywordValues: t.crawlerTask.Config.CustomFormKeywordValues,
+		UploadFiles:             t.crawlerTask.UploadFiles,
 	})
 	tab.Start()
 
@@ -443,4 +428,30 @@ func (r *Result) Close() {
 	if r.AllReqSave != nil {
 		r.AllReqSave.Close()
 	}
+}
+
+func (ct *CrawlerTask) setUploadFileDir(staticPath string) {
+	// 若为相对路径则设置完整路径
+	var allFilePath = []string{}
+	if !path.IsAbs(staticPath) {
+		pwd, _ := os.Getwd()
+		staticPath = path.Join(pwd, staticPath)
+	}
+	fileInfo, err := os.Stat(staticPath)
+	if err != nil {
+		logger.Logger.Fatal("upload file dir or file check failed! ", err.Error())
+	}
+	// 若为目录则找出目录下的所有不大于 10M 的文件
+	if fileInfo.IsDir() {
+		filepath.Walk(staticPath, func(path string, info fs.FileInfo, err error) error {
+			//
+			if !info.IsDir() && info.Size() < config.UploadFileSizeLimited {
+				allFilePath = append(allFilePath, path)
+			}
+			return nil
+		})
+	} else {
+		allFilePath = []string{staticPath}
+	}
+	ct.UploadFiles = allFilePath
 }
