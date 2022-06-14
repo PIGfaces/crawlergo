@@ -73,6 +73,7 @@ func (eu *EngineUsecase) SetTaskResult(req *model.Request) {
 	})
 	if err != nil {
 		logger.Logger.Error("get html failed: ", err.Error())
+		return
 	}
 	taskInfo := map[string]string{
 		req.UniqueId(): req.URL.String(),

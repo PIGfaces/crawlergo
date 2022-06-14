@@ -68,6 +68,13 @@ var (
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Logger.Error("occur some panic: ", r)
+			// 要释放资源，正常退出
+			signalChan <- syscall.SIGTERM
+		}
+	}()
 	author := cli.Author{
 		Name:  "9ian1i, chongzhenghuang",
 		Email: "9ian1itp@gmail.com, chongzhenghuang@caih.com",
