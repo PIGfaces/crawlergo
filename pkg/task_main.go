@@ -8,6 +8,8 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/PIGfaces/crawlergo/internal/biz"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -36,10 +38,17 @@ type (
 		crawledCount  int                // 爬取过的数量
 		taskCountLock sync.Mutex         // 已爬取的任务总数锁
 		redisUsecase  *biz.EngineUsecase // 跟 redis 交互的接口
+		TabRunMonitor
 	}
 
 	CrawlergoOptFunc func(*CrawlerTask)
 )
+
+// 运行时监控
+type TabRunMonitor struct {
+	TabNum    int64 // 已打开的标签页
+	TabTTLNum int64 // 打开的标签页中超时的数量
+}
 
 type Result struct {
 	AllReqSimpFilter *filter2.SimpleFilter
@@ -221,10 +230,6 @@ func (t *CrawlerTask) Run() {
 
 	t.taskWG.Wait()
 	t.Result.Close()
-	// for index := range t.Result.AllReqList {
-	// 	todoFilterAll[index] = t.Result.AllReqList[index]
-	// }
-
 }
 
 /**
@@ -269,7 +274,13 @@ func (t *tabTask) Task() {
 		CustomFormKeywordValues: t.crawlerTask.Config.CustomFormKeywordValues,
 		UploadFiles:             t.crawlerTask.UploadFiles,
 	})
+	// 监听耗时
+	startTime := time.Now()
 	tab.Start()
+	atomic.AddInt64(&t.crawlerTask.TabNum, 1)
+	if time.Until(startTime) > config.TabRunTimeout {
+		atomic.AddInt64(&t.crawlerTask.TabTTLNum, 1)
+	}
 
 	// 收集结果
 	t.crawlerTask.Result.resultLock.Lock()

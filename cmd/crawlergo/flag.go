@@ -37,6 +37,9 @@ var cliFlags = []cli.Flag{
 	SetNoHeadless(),
 	SetRedis(),
 	SetFileUpload(),
+	SetCPUPprof(),
+	SetMemPprof(),
+	SetAutoModifyConcurrence(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -298,5 +301,33 @@ func SetFileUpload() *cli.StringFlag {
 		Name:        "static-file",
 		Usage:       "auto upload file for form submit",
 		Destination: &taskConfig.UploadFileDir,
+	}
+}
+
+func SetCPUPprof() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "cpu-pprof",
+		Value:       false,
+		Usage:       "turn cpu pprof on",
+		Destination: &isCPUPprof,
+	}
+}
+
+func SetMemPprof() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "mem-pprof",
+		Value:       false,
+		Usage:       "turn mem pprof on",
+		Destination: &isMemPprof,
+	}
+}
+
+func SetAutoModifyConcurrence() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "auto-modify-concurrence",
+		Aliases:     []string{"amc"},
+		Value:       false,
+		Usage:       "",
+		Destination: &autoScaleTabs,
 	}
 }
