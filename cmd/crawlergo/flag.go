@@ -37,6 +37,10 @@ var cliFlags = []cli.Flag{
 	SetNoHeadless(),
 	SetRedis(),
 	SetFileUpload(),
+	SetCPUPprof(),
+	SetMemPprof(),
+	SetAutoModifyConcurrence(),
+	SetWeight(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -298,5 +302,42 @@ func SetFileUpload() *cli.StringFlag {
 		Name:        "static-file",
 		Usage:       "auto upload file for form submit",
 		Destination: &taskConfig.UploadFileDir,
+	}
+}
+
+func SetCPUPprof() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "cpu-pprof",
+		Value:       false,
+		Usage:       "turn cpu pprof on",
+		Destination: &isCPUPprof,
+	}
+}
+
+func SetMemPprof() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "mem-pprof",
+		Value:       false,
+		Usage:       "turn mem pprof on",
+		Destination: &isMemPprof,
+	}
+}
+
+func SetAutoModifyConcurrence() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "auto-modify-concurrence",
+		Aliases:     []string{"amc"},
+		Value:       false,
+		Usage:       "config crawlergo auto scale concurrence by cpu,mem,tab timeout percent",
+		Destination: &autoScaleTabs,
+	}
+}
+
+func SetWeight() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:        "scale-concurrence-weight",
+		Aliases:     []string{"scw"},
+		Usage:       "config scale concurrence weight by cpu,mem,tab",
+		Destination: &sweight,
 	}
 }

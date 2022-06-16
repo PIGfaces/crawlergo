@@ -2,8 +2,11 @@ package pkg
 
 import (
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,6 +14,17 @@ var (
 	fileNames = []string{"image.png", "demo.txt", "hello.mp3"}
 	dirNames  = []string{"demo", "test", "hello"}
 )
+
+func getRequest(t *testing.T, urls ...string) []*model.Request {
+	reqList := []*model.Request{}
+	for _, item := range urls {
+		url, err := model.GetUrl(item)
+		assert.Nil(t, err)
+		req := model.GetRequest(config.GET, url)
+		reqList = append(reqList, &req)
+	}
+	return reqList
+}
 
 func TestSetUploadFile(t *testing.T) {
 	testDir := "./testDir"
@@ -71,4 +85,18 @@ func TestSetUploadFile(t *testing.T) {
 	ct.setUploadFileDir(testFileListPath[0])
 
 	assert.Equal(t, ct.UploadFiles, []string{testFileListPath[0]})
+}
+
+func TestXxx(t *testing.T) {
+	path := "/test/demo/hello/world"
+	t.Log(strings.Split(path, "/"))
+}
+
+func TestFuzzTabResultList(t *testing.T) {
+	testReqList := getRequest(t, "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/", "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/2/")
+	resultList := fuzzTabResultList(testReqList)
+	for _, v := range resultList {
+		t.Log(*v)
+	}
+	assert.Len(t, resultList, 4)
 }

@@ -7,7 +7,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/PIGfaces/crawlergo/internal/biz"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -17,6 +20,8 @@ import (
 	"github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/PIGfaces/crawlergo/pkg/resultsave"
 	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/panjf2000/ants/v2"
 )
@@ -36,10 +41,17 @@ type (
 		crawledCount  int                // 爬取过的数量
 		taskCountLock sync.Mutex         // 已爬取的任务总数锁
 		redisUsecase  *biz.EngineUsecase // 跟 redis 交互的接口
+		TabRunMonitor
 	}
 
 	CrawlergoOptFunc func(*CrawlerTask)
 )
+
+// 运行时监控
+type TabRunMonitor struct {
+	TabNum    int64 // 已打开的标签页
+	TabTTLNum int64 // 打开的标签页中超时的数量
+}
 
 type Result struct {
 	AllReqSimpFilter *filter2.SimpleFilter
@@ -55,6 +67,8 @@ type tabTask struct {
 	browser     *engine2.Browser
 	req         *model.Request
 }
+
+var fuzzPathSet = mapset.NewSet()
 
 /**
 新建爬虫任务
@@ -221,10 +235,6 @@ func (t *CrawlerTask) Run() {
 
 	t.taskWG.Wait()
 	t.Result.Close()
-	// for index := range t.Result.AllReqList {
-	// 	todoFilterAll[index] = t.Result.AllReqList[index]
-	// }
-
 }
 
 /**
@@ -269,7 +279,15 @@ func (t *tabTask) Task() {
 		CustomFormKeywordValues: t.crawlerTask.Config.CustomFormKeywordValues,
 		UploadFiles:             t.crawlerTask.UploadFiles,
 	})
+	// 监听耗时
+	startTime := time.Now()
 	tab.Start()
+	atomic.AddInt64(&t.crawlerTask.TabNum, 1)
+	if time.Until(startTime) > config.TabRunTimeout {
+		atomic.AddInt64(&t.crawlerTask.TabTTLNum, 1)
+	}
+
+	tab.ResultList = fuzzTabResultList(tab.ResultList)
 
 	// 收集结果
 	t.crawlerTask.Result.resultLock.Lock()
@@ -454,4 +472,25 @@ func (ct *CrawlerTask) setUploadFileDir(staticPath string) {
 		allFilePath = []string{staticPath}
 	}
 	ct.UploadFiles = allFilePath
+}
+
+func fuzzTabResultList(result []*model.Request) []*model.Request {
+	resultList := result
+	for _, req := range result {
+		pathList := strings.Split(req.URL.Path, "/")
+		fuzzPaths := make([]string, 0, len(pathList))
+		for i := range pathList {
+			fzp := pathList[0]
+			for j := 1; j < i; j++ {
+				fzp = fmt.Sprintf("%s/%s", fzp, pathList[j])
+			}
+			uniqueID := tools.StrMd5(fzp)
+			if !fuzzPathSet.Contains(uniqueID) {
+				fuzzPaths = append(fuzzPaths, fzp)
+				fuzzPathSet.Add(uniqueID)
+			}
+		}
+		resultList = append(resultList, doFuzz(*req, fuzzPaths)...)
+	}
+	return resultList
 }

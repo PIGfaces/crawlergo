@@ -1,13 +1,20 @@
 package main
 
+//go:generate mockgen -source=main.go -destination=../../mock/cmd/crawlergo/main_mock.go -package=main
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
+
+	"runtime/pprof"
 
 	"github.com/PIGfaces/crawlergo/pkg"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -15,6 +22,7 @@ import (
 	model2 "github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/PIGfaces/crawlergo/pkg/tools"
 	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
+	"github.com/shirou/gopsutil/process"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/sirupsen/logrus"
@@ -49,6 +57,17 @@ type ProxyTask struct {
 	pushProxy string
 }
 
+type ProcessImp interface {
+	CPUPercent() (float64, error)
+	MemoryPercent() (float32, error)
+}
+
+type scaleWeight struct {
+	CpuWeight    float64 `json:"CpuWeight"`
+	MemWeight    float64 `json:"MemWeight"`
+	TabTTLWeight float64 `json:"TabTTLWeight"`
+}
+
 const DefaultMaxPushProxyPoolMax = 10
 const DefaultLogLevel = "Info"
 
@@ -65,6 +84,17 @@ var (
 	pushProxyWG             sync.WaitGroup
 	logLevel                string
 	Version                 string
+	isCPUPprof              bool
+	isMemPprof              bool
+	autoScaleTabs           bool
+	scaleCtx                context.Context
+	scaleCtxCancle          context.CancelFunc
+	sweight                 string
+	sw                      scaleWeight = scaleWeight{
+		CpuWeight:    0.4,
+		MemWeight:    0.3,
+		TabTTLWeight: 0.3,
+	}
 )
 
 func main() {
@@ -103,8 +133,12 @@ func main() {
 }
 
 func run(c *cli.Context) error {
+	saveCpuPprof()
+	saveMemPprof()
+
 	signalChan = make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+	scaleCtx, scaleCtxCancle = context.WithCancel(context.Background())
 
 	if c.Args().Len() == 0 && taskConfig.RedisConnectInfo == "" {
 		// if c.Args().Len() == 0 {
@@ -154,6 +188,11 @@ func run(c *cli.Context) error {
 	}
 
 	go handleExit(task)
+	// ModifyScaleWeight 调整 scale 权重
+	ModifyScaleWeight(sweight)
+	if autoScaleTabs || sweight != "" {
+		go autoScaleConcurrency(task)
+	}
 	logger.Logger.Info("Start crawling.")
 	task.Run()
 	// result := task.Result
@@ -230,12 +269,127 @@ func (p *ProxyTask) doRequest() {
 		&requests.ReqOptions{Timeout: 1, AllowRedirect: false, Proxy: p.pushProxy})
 }
 
+func autoScaleConcurrency(t *pkg.CrawlerTask) {
+	tc := time.NewTicker(time.Second * 10)
+	p, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		logger.Logger.Fatal("cannot start monitor process self: ", err.Error())
+	}
+	for {
+		select {
+		case <-tc.C:
+			ModifyPool(t, p)
+		case <-scaleCtx.Done():
+			logger.Logger.Debug("scale tab max number exit...")
+			tc.Stop()
+			return
+		}
+	}
+}
+
+// 自动调整协程池
+func ModifyPool(t *pkg.CrawlerTask, p ProcessImp) {
+	cpuPer, err := p.CPUPercent()
+	if err != nil {
+		logger.Logger.Debug("get cpu percent failed: ", err.Error())
+	}
+	memPer, err := p.MemoryPercent()
+	if err != nil {
+		logger.Logger.Debug("get mem percent failed: ", err.Error())
+	}
+	// 标签页超时比例
+	tabTimeoutPercent := float64(t.TabTTLNum) / float64(t.TabNum)
+
+	// 计算权重: cpu 利用率占 40%, 内存利用率占 30%, 标签页超时占 30%
+	totalPer := (cpuPer*sw.CpuWeight + float64(memPer)*sw.MemWeight + tabTimeoutPercent*sw.TabTTLWeight)
+	// 每次伸缩都以 30 个标签页为基准
+	scaleNum := math.Ceil(30 * totalPer)
+	needModifyTabNumFlag := false
+	if t.Pool.Running() == t.Config.MaxTabsCount {
+		// 若所有的标签页都跑满才会进行伸缩
+		if totalPer > 0.7 {
+			// 若负载权重 > 70% 说明机器负载比较大, 降低
+			if int(scaleNum) < t.Config.MaxTabsCount {
+				// 正常伸缩
+				needModifyTabNumFlag = true
+				t.Config.MaxTabsCount -= int(scaleNum)
+			} else {
+				// 折半
+				needModifyTabNumFlag = true
+				t.Config.MaxTabsCount -= int(math.Ceil(float64(t.Config.MaxTabsCount) / 2))
+			}
+		} else if totalPer < 0.4 {
+			needModifyTabNumFlag = true
+			t.Config.MaxTabsCount += int(scaleNum)
+		}
+	}
+
+	if needModifyTabNumFlag {
+		// 对并发进行调整
+		t.Pool.Tune(t.Config.MaxTabsCount)
+		logger.Logger.Debug("adjuest tab runing num: ", t.Config.MaxTabsCount)
+		return
+	}
+	logger.Logger.Debug("no adjuest tab num")
+}
+
 func handleExit(t *pkg.CrawlerTask) {
 	<-signalChan
-	fmt.Println("exit ...")
+	scaleCtxCancle()
+	logger.Logger.Debug("exit ...")
 	t.Pool.Tune(1)
 	t.Pool.Release()
 	t.Browser.Close()
 	t.Result.Close()
 	os.Exit(-1)
+}
+
+// saveCpuPprof 保存 cpu 的信息
+func saveCpuPprof() {
+
+	if isCPUPprof {
+		file, err := os.Create(fmt.Sprintf("./%s_cpu.pprof", time.Now().String()))
+		if err != nil {
+			panic(err)
+		}
+		pprof.StartCPUProfile(file)
+		defer func() {
+			pprof.StopCPUProfile()
+			file.Close()
+		}()
+	}
+}
+
+// saveMemPprof 保存内存信息
+func saveMemPprof() {
+	if isMemPprof {
+		file, err := os.Create(fmt.Sprintf("./%s_mem.pprof", time.Now().Format("2022-06-13_13:00:00")))
+		if err != nil {
+			panic(err)
+		}
+		pprof.WriteHeapProfile(file)
+		defer file.Close()
+	}
+}
+
+func ModifyScaleWeight(weightJson string) scaleWeight {
+	if len(weightJson) <= 0 {
+		return scaleWeight{}
+	}
+	destWeight := scaleWeight{}
+	if err := json.Unmarshal([]byte(weightJson), &destWeight); err != nil {
+		logger.Logger.Fatal("scale weight cannot unmarshal, please check your json struct: ", err.Error())
+	}
+
+	for _, v := range []float64{
+		destWeight.CpuWeight,
+		destWeight.MemWeight,
+		destWeight.TabTTLWeight,
+	} {
+		if v > 0.9 || v < 0.1 {
+			logger.Logger.Fatal("signal weight must in (0.1, 0.9)")
+		}
+	}
+	sw = destWeight
+	return destWeight
 }
