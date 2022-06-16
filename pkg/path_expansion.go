@@ -37,7 +37,6 @@ const pathStr = "11/123/2017/2018/message/mis/model/abstract/account/act/action"
 	"/admin/admin_bak/mobile/m/js"
 
 var pathFuzzWG sync.WaitGroup
-var validateUrl mapset.Set
 
 /**
 从robots.txt文件中获取路径信息
@@ -102,23 +101,23 @@ func GetPathsByFuzzDict(navReq model2.Request, dictPath string) []*model2.Reques
 type singleFuzz struct {
 	navReq model2.Request
 	path   string
+	urlSet mapset.Set
 }
 
 func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
-	validateUrl = mapset.NewSet()
+	validateUrl := mapset.NewSet()
 	var result []*model2.Request
-	pool, _ := ants.NewPool(20)
-	defer pool.Release()
 	for _, path := range pathList {
 		path = strings.TrimPrefix(path, "/")
 		path = strings.TrimSuffix(path, "\n")
 		task := singleFuzz{
 			navReq: navReq,
 			path:   path,
+			urlSet: validateUrl,
 		}
 		pathFuzzWG.Add(1)
 		go func() {
-			err := pool.Submit(task.doRequest)
+			err := ants.Submit(task.doRequest)
 			if err != nil {
 				pathFuzzWG.Done()
 			}
@@ -153,7 +152,7 @@ func (s singleFuzz) doRequest() {
 		return
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		validateUrl.Add(url)
+		s.urlSet.Add(url)
 	} else if resp.StatusCode == 301 {
 		locations := resp.Header["Location"]
 		if len(locations) == 0 {
@@ -165,7 +164,7 @@ func (s singleFuzz) doRequest() {
 			return
 		}
 		if redirectUrl.Host == s.navReq.URL.Host {
-			validateUrl.Add(url)
+			s.urlSet.Add(url)
 		}
 	}
 }

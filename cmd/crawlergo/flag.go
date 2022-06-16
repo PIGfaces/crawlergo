@@ -40,6 +40,7 @@ var cliFlags = []cli.Flag{
 	SetCPUPprof(),
 	SetMemPprof(),
 	SetAutoModifyConcurrence(),
+	SetWeight(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -327,7 +328,16 @@ func SetAutoModifyConcurrence() *cli.BoolFlag {
 		Name:        "auto-modify-concurrence",
 		Aliases:     []string{"amc"},
 		Value:       false,
-		Usage:       "",
+		Usage:       "config crawlergo auto scale concurrence by cpu,mem,tab timeout percent",
 		Destination: &autoScaleTabs,
+	}
+}
+
+func SetWeight() *cli.StringFlag {
+	return &cli.StringFlag{
+		Name:        "scale-concurrence-weight",
+		Aliases:     []string{"scw"},
+		Usage:       "config scale concurrence weight by cpu,mem,tab",
+		Destination: &sweight,
 	}
 }

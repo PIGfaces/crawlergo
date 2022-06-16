@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/PIGfaces/crawlergo/pkg/resultsave"
 	taskPkg "github.com/PIGfaces/crawlergo/pkg/task"
+	"github.com/PIGfaces/crawlergo/pkg/tools"
+	mapset "github.com/deckarep/golang-set"
 
 	"github.com/panjf2000/ants/v2"
 )
@@ -64,6 +67,8 @@ type tabTask struct {
 	browser     *engine2.Browser
 	req         *model.Request
 }
+
+var fuzzPathSet = mapset.NewSet()
 
 /**
 新建爬虫任务
@@ -282,6 +287,8 @@ func (t *tabTask) Task() {
 		atomic.AddInt64(&t.crawlerTask.TabTTLNum, 1)
 	}
 
+	tab.ResultList = fuzzTabResultList(tab.ResultList)
+
 	// 收集结果
 	t.crawlerTask.Result.resultLock.Lock()
 	// 保存所有结果，包括域名
@@ -465,4 +472,25 @@ func (ct *CrawlerTask) setUploadFileDir(staticPath string) {
 		allFilePath = []string{staticPath}
 	}
 	ct.UploadFiles = allFilePath
+}
+
+func fuzzTabResultList(result []*model.Request) []*model.Request {
+	resultList := result
+	for _, req := range result {
+		pathList := strings.Split(req.URL.Path, "/")
+		fuzzPaths := make([]string, 0, len(pathList))
+		for i := range pathList {
+			fzp := pathList[0]
+			for j := 1; j < i; j++ {
+				fzp = fmt.Sprintf("%s/%s", fzp, pathList[j])
+			}
+			uniqueID := tools.StrMd5(fzp)
+			if !fuzzPathSet.Contains(uniqueID) {
+				fuzzPaths = append(fuzzPaths, fzp)
+				fuzzPathSet.Add(uniqueID)
+			}
+		}
+		resultList = append(resultList, doFuzz(*req, fuzzPaths)...)
+	}
+	return resultList
 }
