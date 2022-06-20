@@ -148,9 +148,10 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		fn(&taskConf)
 	}
 
+	modifyMaxCrawCnt := len(crawlerTask.Targets) * 20
 	if taskConf.MaxCrawlCount < len(crawlerTask.Targets) {
 		// 如果最大爬取数量都少于任务数量就会不完整了
-		taskConf.MaxCrawlCount = len(crawlerTask.Targets) * 100
+		taskConf.MaxCrawlCount = modifyMaxCrawCnt
 	}
 
 	crawlerTask.setUploadFileDir(taskConf.UploadFileDir)
@@ -161,6 +162,11 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 			logger.Logger.Error("custom headers can't be Unmarshal.")
 			return nil, err
 		}
+	}
+
+	if taskConf.CrawDepth > 0 && taskConf.MaxCrawlCount < len(crawlerTask.Targets)*taskConf.CrawDepth*20 {
+		// 有爬取深度并且爬取任务总量少于任务总数 * 20 * 爬取深度
+		taskConf.MaxCrawlCount = modifyMaxCrawCnt * taskConf.CrawDepth
 	}
 
 	crawlerTask.Browser = engine2.InitBrowser(taskConf.ChromiumPath, taskConf.IncognitoContext, taskConf.ExtraHeaders, taskConf.Proxy, taskConf.NoHeadless)
@@ -243,7 +249,8 @@ func (t *CrawlerTask) Run() {
 */
 func (t *CrawlerTask) addTask2Pool(req *model.Request) {
 	t.taskCountLock.Lock()
-	if t.crawledCount >= t.Config.MaxCrawlCount {
+	if t.crawledCount >= t.Config.MaxCrawlCount || req.Depth >= t.Config.CrawDepth {
+		// 深度控制
 		t.taskCountLock.Unlock()
 		return
 	} else {
@@ -267,21 +274,22 @@ func (t *CrawlerTask) addTask2Pool(req *model.Request) {
 */
 func (t *tabTask) Task() {
 	defer t.crawlerTask.taskWG.Done()
-	tab := engine2.NewTab(t.browser, *t.req, engine2.TabConfig{
-		TabRunTimeout:           t.crawlerTask.Config.TabRunTimeout,
-		DomContentLoadedTimeout: t.crawlerTask.Config.DomContentLoadedTimeout,
-		EventTriggerMode:        t.crawlerTask.Config.EventTriggerMode,
-		EventTriggerInterval:    t.crawlerTask.Config.EventTriggerInterval,
-		BeforeExitDelay:         t.crawlerTask.Config.BeforeExitDelay,
-		EncodeURLWithCharset:    t.crawlerTask.Config.EncodeURLWithCharset,
-		IgnoreKeywords:          t.crawlerTask.Config.IgnoreKeywords,
-		CustomFormValues:        t.crawlerTask.Config.CustomFormValues,
-		CustomFormKeywordValues: t.crawlerTask.Config.CustomFormKeywordValues,
-		UploadFiles:             t.crawlerTask.UploadFiles,
-	})
+
+	tbConf := engine2.NewByCrawTab(t.crawlerTask.Config)
+	tabCtx, tabCancel := t.browser.NewTab(config.TabRunTimeout)
+	tab := engine2.NewTab(
+		engine2.WithTabContext(tabCtx, tabCancel),
+		engine2.WithExtraHeader(t.req, t.browser.ExtraHeaders),
+		engine2.WithTabConfig(*tbConf),
+	)
 	// 监听耗时
 	startTime := time.Now()
 	tab.Start()
+
+	if t.crawlerTask.redisUsecase != nil {
+		go t.crawlerTask.redisUsecase.SetTaskResult(t.req)
+	}
+
 	atomic.AddInt64(&t.crawlerTask.TabNum, 1)
 	if time.Until(startTime) > config.TabRunTimeout {
 		atomic.AddInt64(&t.crawlerTask.TabTTLNum, 1)
@@ -413,22 +421,10 @@ func (t *CrawlerTask) SaveAllReqInfo(req *model.Request) {
 
 // SaveReqResult 保存有效的请求结果
 func (t *CrawlerTask) SaveReqResult(req *model.Request) {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		if t.Result.ReqSave != nil {
-			t.Result.ReqSave.Save(req)
-		}
-	}()
+	if t.Result.ReqSave != nil {
+		t.Result.ReqSave.Save(req)
+	}
 
-	go func() {
-		defer wg.Done()
-		if t.redisUsecase != nil {
-			t.redisUsecase.SetTaskResult(req)
-		}
-	}()
-	wg.Wait()
 }
 
 func (r *Result) Close() {

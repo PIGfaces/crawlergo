@@ -31,6 +31,7 @@ type TaskConfig struct {
 	CustomFormKeywordValues map[string]string // 自定义表单关键词填充内容
 	RedisConnectInfo        string            // 通过 redis 进行交互需要的信息
 	UploadFileDir           string
+	CrawDepth               int // 爬取深度
 }
 
 type TaskConfigOptFunc func(*TaskConfig)
@@ -43,6 +44,12 @@ func NewTaskConfig(optFuncs ...TaskConfigOptFunc) *TaskConfig {
 	return conf
 }
 
+func NewCrawDepth(crawDepth int) TaskConfigOptFunc {
+	return func(tc *TaskConfig) {
+		tc.CrawDepth = crawDepth
+	}
+}
+
 func (t *TaskConfig) SetConf(optFuncs ...TaskConfigOptFunc) {
 	for _, fn := range optFuncs {
 		fn(t)
@@ -51,6 +58,7 @@ func (t *TaskConfig) SetConf(optFuncs ...TaskConfigOptFunc) {
 
 func WithMaxCrawlCount(maxCrawlCount int) TaskConfigOptFunc {
 	return func(tc *TaskConfig) {
+
 		if tc.MaxCrawlCount == 0 {
 			tc.MaxCrawlCount = maxCrawlCount
 		}

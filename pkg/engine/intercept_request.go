@@ -44,7 +44,7 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 	if IsIgnoredByKeywordMatch(req, tab.config.IgnoreKeywords) {
 		_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
 		req.Source = config.FromXHR
-		tab.AddResultRequest(req)
+		tab.AddResultRequest(&req)
 		return
 	}
 
@@ -55,7 +55,7 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 		if strings.HasSuffix(strings.ToLower(url.Path), suffix) {
 			_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
 			req.Source = config.FromStaticRes
-			tab.AddResultRequest(req)
+			tab.AddResultRequest(&req)
 			return
 		}
 	}
@@ -65,12 +65,12 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 		tab.NavNetworkID = v.NetworkID.String()
 		tab.HandleNavigationReq(&req, v)
 		req.Source = config.FromNavigation
-		tab.AddResultRequest(req)
+		tab.AddResultRequest(&req)
 		return
 	}
 
 	req.Source = config.FromXHR
-	tab.AddResultRequest(req)
+	tab.AddResultRequest(&req)
 	_ = fetch.ContinueRequest(v.RequestID).Do(ctx)
 }
 

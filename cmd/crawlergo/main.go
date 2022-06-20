@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"runtime/pprof"
+	"runtime/trace"
 
 	"github.com/PIGfaces/crawlergo/pkg"
 	"github.com/PIGfaces/crawlergo/pkg/config"
@@ -133,8 +134,14 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	saveCpuPprof()
-	saveMemPprof()
+	if isCPUPprof {
+		clean := saveCpuPprof()
+		defer clean()
+	}
+	if isMemPprof {
+		cleanmem := saveMemPprof()
+		defer cleanmem()
+	}
 
 	signalChan = make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
@@ -345,30 +352,33 @@ func handleExit(t *pkg.CrawlerTask) {
 }
 
 // saveCpuPprof 保存 cpu 的信息
-func saveCpuPprof() {
+func saveCpuPprof() func() {
 
 	if isCPUPprof {
-		file, err := os.Create(fmt.Sprintf("./%s_cpu.pprof", time.Now().String()))
+		file, err := os.Create(fmt.Sprintf("./%s_cpu.pprof", time.Now().Format("2006-01-02_15:04:05")))
 		if err != nil {
 			panic(err)
 		}
-		pprof.StartCPUProfile(file)
-		defer func() {
-			pprof.StopCPUProfile()
+		trace.Start(file)
+		// pprof.StartCPUProfile(file)
+		return func() {
+			// pprof.StopCPUProfile()
+			trace.Stop()
 			file.Close()
-		}()
+		}
 	}
+	return func() {}
 }
 
 // saveMemPprof 保存内存信息
-func saveMemPprof() {
-	if isMemPprof {
-		file, err := os.Create(fmt.Sprintf("./%s_mem.pprof", time.Now().Format("2022-06-13_13:00:00")))
-		if err != nil {
-			panic(err)
-		}
-		pprof.WriteHeapProfile(file)
-		defer file.Close()
+func saveMemPprof() func() {
+	file, err := os.Create(fmt.Sprintf("./%s_mem.pprof", time.Now().Format("2006-01-02_15:04:05")))
+	if err != nil {
+		panic(err)
+	}
+	pprof.WriteHeapProfile(file)
+	return func() {
+		file.Close()
 	}
 }
 

@@ -5,8 +5,6 @@ import (
 
 	"github.com/PIGfaces/crawlergo/pkg/logger"
 	"github.com/PIGfaces/crawlergo/pkg/model"
-	"github.com/PIGfaces/crawlergo/pkg/tools"
-	"github.com/PIGfaces/crawlergo/pkg/tools/requests"
 
 	"encoding/json"
 	"fmt"
@@ -68,21 +66,17 @@ func (eu *EngineUsecase) GetTasks() Tasks {
 }
 
 func (eu *EngineUsecase) SetTaskResult(req *model.Request) {
-	resp, err := requests.Request(req.Method, req.URL.String(), tools.ConvertHeaders(req.Headers), []byte(req.PostData), &requests.ReqOptions{
-		Timeout: 1, AllowRedirect: false, Proxy: eu.pushAddress,
-	})
-	if err != nil {
-		logger.Logger.Error("get html failed: ", err.Error())
-		return
-	}
 	taskInfo := map[string]string{
 		req.UniqueId(): req.URL.String(),
-		"html":         resp.Text,
+		"html":         req.HtmlCode,
 	}
-	taskValue, _ := json.Marshal(taskInfo)
+	taskValue, err := json.Marshal(taskInfo)
+	if err != nil {
+		logger.Logger.Debug("set redis task result failed! ", err.Error())
+	}
 
 	taskKey := fmt.Sprintf("%s:%s", req.TaskID, req.UniqueId())
-	if err = eu.repo.SetResult(context.Background(), taskKey, string(taskValue)); err != nil {
+	if err := eu.repo.SetResult(context.Background(), taskKey, string(taskValue)); err != nil {
 		logger.Logger.Error("set result failed, err: ", err.Error())
 	}
 }

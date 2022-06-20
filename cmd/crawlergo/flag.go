@@ -41,6 +41,7 @@ var cliFlags = []cli.Flag{
 	SetMemPprof(),
 	SetAutoModifyConcurrence(),
 	SetWeight(),
+	SetCrawDepth(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -339,5 +340,14 @@ func SetWeight() *cli.StringFlag {
 		Aliases:     []string{"scw"},
 		Usage:       "config scale concurrence weight by cpu,mem,tab",
 		Destination: &sweight,
+	}
+}
+
+func SetCrawDepth() *cli.IntFlag {
+	return &cli.IntFlag{
+		Name:        "craw-depth",
+		Aliases:     []string{"cdph"},
+		Usage:       "setting craw depth, ",
+		Destination: &taskConfig.CrawDepth,
 	}
 }

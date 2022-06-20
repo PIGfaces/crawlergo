@@ -36,8 +36,6 @@ const pathStr = "11/123/2017/2018/message/mis/model/abstract/account/act/action"
 	"/util/v1/v2/vendor/view/views/web/weixin/widgets/wm/wordpress/workspace/ws/www/www2/wwwroot/zone" +
 	"/admin/admin_bak/mobile/m/js"
 
-var pathFuzzWG sync.WaitGroup
-
 /**
 从robots.txt文件中获取路径信息
 */
@@ -102,11 +100,14 @@ type singleFuzz struct {
 	navReq model2.Request
 	path   string
 	urlSet mapset.Set
+	fuzzWg *sync.WaitGroup
 }
 
 func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 	validateUrl := mapset.NewSet()
 	var result []*model2.Request
+	var wg sync.WaitGroup
+
 	for _, path := range pathList {
 		path = strings.TrimPrefix(path, "/")
 		path = strings.TrimSuffix(path, "\n")
@@ -114,17 +115,18 @@ func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 			navReq: navReq,
 			path:   path,
 			urlSet: validateUrl,
+			fuzzWg: &wg,
 		}
-		pathFuzzWG.Add(1)
+		wg.Add(1)
 		go func() {
 			err := ants.Submit(task.doRequest)
 			if err != nil {
-				pathFuzzWG.Done()
+				wg.Done()
 			}
 		}()
 	}
 
-	pathFuzzWG.Wait()
+	wg.Wait()
 	for _, _url := range validateUrl.ToSlice() {
 		_url := _url.(string)
 		url, err := model2.GetUrl(_url)
@@ -143,7 +145,7 @@ func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 
  */
 func (s singleFuzz) doRequest() {
-	defer pathFuzzWG.Done()
+	defer s.fuzzWg.Done()
 
 	url := fmt.Sprintf(`%s://%s/%s`, s.navReq.URL.Scheme, s.navReq.URL.Host, s.path)
 	resp, errs := requests.Get(url, tools.ConvertHeaders(s.navReq.Headers),

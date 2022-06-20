@@ -14,7 +14,7 @@ import (
 
 type Browser struct {
 	Ctx          *context.Context
-	Cancel       *context.CancelFunc
+	Cancel       context.CancelFunc
 	tabs         []*context.Context
 	tabCancels   []context.CancelFunc
 	ExtraHeaders map[string]interface{}
@@ -70,13 +70,13 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 	// https://github.com/chromedp/chromedp/issues/824#issuecomment-845664441
 	// 如果需要在一个浏览器上创建多个tab，则需要先创建浏览器的上下文，即运行下面的语句
 	chromedp.Run(bctx)
-	bro.Cancel = &cancel
+	bro.Cancel = cancel
 	bro.Ctx = &bctx
 	bro.ExtraHeaders = extraHeaders
 	return &bro
 }
 
-func (bro *Browser) NewTab(timeout time.Duration) (*context.Context, context.CancelFunc) {
+func (bro *Browser) NewTab(timeout time.Duration) (context.Context, context.CancelFunc) {
 	bro.lock.Lock()
 	ctx, cancel := chromedp.NewContext(*bro.Ctx)
 	//defer cancel()
@@ -87,7 +87,7 @@ func (bro *Browser) NewTab(timeout time.Duration) (*context.Context, context.Can
 	bro.lock.Unlock()
 
 	//return bro.Ctx, &cancel
-	return &tCtx, cancel
+	return tCtx, cancel
 }
 
 func (bro *Browser) Close() {
@@ -107,5 +107,5 @@ func (bro *Browser) Close() {
 	if err != nil {
 		logger.Logger.Debug(err)
 	}
-	(*bro.Cancel)()
+	(bro.Cancel)()
 }

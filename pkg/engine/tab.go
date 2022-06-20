@@ -25,9 +25,9 @@ import (
 )
 
 type Tab struct {
-	Ctx              *context.Context
+	Ctx              context.Context
 	Cancel           context.CancelFunc
-	NavigateReq      model2.Request
+	NavigateReq      *model2.Request
 	ExtraHeaders     map[string]interface{}
 	ResultList       []*model2.Request
 	TopFrameId       string
@@ -51,44 +51,27 @@ type Tab struct {
 	fillFormWG    sync.WaitGroup //填充表单任务
 }
 
-type TabConfig struct {
-	TabRunTimeout           time.Duration
-	DomContentLoadedTimeout time.Duration
-	EventTriggerMode        string        // 事件触发的调用方式： 异步 或 顺序
-	EventTriggerInterval    time.Duration // 事件触发的间隔 单位毫秒
-	BeforeExitDelay         time.Duration // 退出前的等待时间，等待DOM渲染，等待XHR发出捕获
-	EncodeURLWithCharset    bool
-	IgnoreKeywords          []string //
-	Proxy                   string
-	CustomFormValues        map[string]string
-	CustomFormKeywordValues map[string]string
-	UploadFiles             []string
-}
-
 type bindingCallPayload struct {
 	Name string   `json:"name"`
 	Seq  int      `json:"seq"`
 	Args []string `json:"args"`
 }
 
-func NewTab(browser *Browser, navigateReq model2.Request, config TabConfig) *Tab {
+type TabOptFunc func(*Tab)
+
+func NewTab(optFunc ...TabOptFunc) *Tab {
 	var tab Tab
-	tab.ExtraHeaders = map[string]interface{}{}
-	var DOMContentLoadedRun = false
-	tab.Ctx, tab.Cancel = browser.NewTab(config.TabRunTimeout)
-	for key, value := range browser.ExtraHeaders {
-		navigateReq.Headers[key] = value
-		if key != "Host" {
-			tab.ExtraHeaders[key] = value
-		}
+	// 代理函数初始化 tab 参数
+	for _, fn := range optFunc {
+		fn(&tab)
 	}
-	tab.NavigateReq = navigateReq
-	tab.config = config
+
+	var DOMContentLoadedRun = false
 	tab.NavDone = make(chan struct{})
 	tab.DocBodyNodeId = 0
 
 	// 设置请求拦截监听
-	chromedp.ListenTarget(*tab.Ctx, func(v interface{}) {
+	chromedp.ListenTarget(tab.Ctx, func(v interface{}) {
 		switch v := v.(type) {
 		// 根据不同的事件 选择执行对应的动作
 		case *network.EventRequestWillBeSent:
@@ -191,18 +174,20 @@ func waitNavigateDone(ctx context.Context) error {
 func (tab *Tab) Start() {
 	logger.Logger.Info("Crawling " + tab.NavigateReq.Method + " " + tab.NavigateReq.URL.String())
 	defer tab.Cancel()
-	if err := chromedp.Run(*tab.Ctx,
-		RunWithTimeOut(tab.Ctx, tab.config.DomContentLoadedTimeout, chromedp.Tasks{
+	if err := chromedp.Run(tab.Ctx,
+		RunWithTimeOut(tab.config.DomContentLoadedTimeout, chromedp.Tasks{
 			//
 			runtime.Enable(),
 			// 开启网络层API
 			network.Enable(),
+			// /*
 			// 开启请求拦截API
 			fetch.Enable().WithHandleAuthRequests(true),
 			// 添加回调函数绑定
 			// XSS-Scan 使用的回调
 			runtime.AddBinding("addLink"),
 			runtime.AddBinding("Test"),
+			// */
 			// 初始化执行JS
 			chromedp.ActionFunc(func(ctx context.Context) error {
 				var err error
@@ -247,6 +232,11 @@ func (tab *Tab) Start() {
 	logger.Logger.Debug("collectLinks start.")
 	tab.collectLinkWG.Add(3)
 	go tab.collectLinks()
+	if tab.config.SaveHtmlCode {
+		// 获取网页源码
+		tab.collectLinkWG.Add(1)
+		go tab.getHtml()
+	}
 	tab.collectLinkWG.Wait()
 	logger.Logger.Debug("collectLinks end.")
 
@@ -263,7 +253,7 @@ func (tab *Tab) Start() {
 	// fmt.Println("Finished " + tab.NavigateReq.Method + " " + tab.NavigateReq.URL.String())
 }
 
-func RunWithTimeOut(ctx *context.Context, timeout time.Duration, tasks chromedp.Tasks) chromedp.ActionFunc {
+func RunWithTimeOut(timeout time.Duration, tasks chromedp.Tasks) chromedp.ActionFunc {
 	return func(ctx context.Context) error {
 		timeoutContext, _ := context.WithTimeout(ctx, timeout)
 		//defer cancel()
@@ -308,6 +298,8 @@ func (tab *Tab) AddResultUrl(method string, _url string, source string) {
 	req.Source = source
 	// 继承任务ID
 	req.TaskID = tab.NavigateReq.TaskID
+	// 深度 + 1
+	req.Depth = tab.NavigateReq.Depth + 1
 
 	tab.lock.Lock()
 	tab.ResultList = append(tab.ResultList, &req)
@@ -317,7 +309,7 @@ func (tab *Tab) AddResultUrl(method string, _url string, source string) {
 /**
 添加请求到结果列表，拦截请求时处理了Host绑定，此处无需处理
 */
-func (tab *Tab) AddResultRequest(req model2.Request) {
+func (tab *Tab) AddResultRequest(req *model2.Request) {
 	for key, value := range tab.ExtraHeaders {
 		req.Headers[key] = value
 	}
@@ -325,7 +317,7 @@ func (tab *Tab) AddResultRequest(req model2.Request) {
 
 	// 继承任务ID
 	req.TaskID = tab.NavigateReq.TaskID
-	tab.ResultList = append(tab.ResultList, &req)
+	tab.ResultList = append(tab.ResultList, req)
 	tab.lock.Unlock()
 }
 
@@ -333,8 +325,8 @@ func (tab *Tab) AddResultRequest(req model2.Request) {
 获取当前标签页CDP的执行上下文
 */
 func (tab *Tab) GetExecutor() context.Context {
-	c := chromedp.FromContext(*tab.Ctx)
-	ctx := cdp.WithExecutor(*tab.Ctx, c.Target)
+	c := chromedp.FromContext(tab.Ctx)
+	ctx := cdp.WithExecutor(tab.Ctx, c.Target)
 	return ctx
 }
 
@@ -354,7 +346,9 @@ func (tab *Tab) HandleBindingCalled(event *runtime.EventBindingCalled) {
 	defer tab.WG.Done()
 	payload := []byte(event.Payload)
 	var bcPayload bindingCallPayload
-	_ = json.Unmarshal(payload, &bcPayload)
+	if err := json.Unmarshal(payload, &bcPayload); err != nil {
+		logger.Logger.Error("binding called unmarshal failed: ", err.Error())
+	}
 	if bcPayload.Name == "addLink" && len(bcPayload.Args) > 1 {
 		tab.AddResultUrl(config.GET, bcPayload.Args[0], bcPayload.Args[1])
 	}
@@ -412,7 +406,7 @@ func (tab *Tab) DetectCharset() {
 	var ok bool
 	var getCharsetRegex = regexp.MustCompile("charset=(.+)$")
 	err := chromedp.AttributeValue(`meta[http-equiv=Content-Type]`, "content", &content, &ok, chromedp.ByQuery).Do(tCtx)
-	if err != nil || ok != true {
+	if err != nil || !ok {
 		return
 	}
 	if strings.Contains(content, "charset=") {
@@ -448,4 +442,33 @@ func IsIgnoredByKeywordMatch(req model2.Request, IgnoreKeywords []string) bool {
 		}
 	}
 	return false
+}
+
+func WithExtraHeader(navigateReq *model2.Request, extreHead map[string]interface{}) TabOptFunc {
+	return func(t *Tab) {
+		t.ExtraHeaders = make(map[string]interface{})
+		for key, val := range extreHead {
+			// XXX: 不太理解这里要仅仅去掉了 tab 的 Host 设置的 header
+			navigateReq.Headers[key] = val
+			if key != "Host" {
+				t.ExtraHeaders[key] = val
+			}
+		}
+		t.NavigateReq = navigateReq
+	}
+}
+
+// WithTabConfig: 单个标签页需要用到的配置
+func WithTabConfig(conf TabConfig) TabOptFunc {
+	return func(t *Tab) {
+		t.config = conf
+	}
+}
+
+// WithTabContext 标签页上下文
+func WithTabContext(ctx context.Context, cancel context.CancelFunc) TabOptFunc {
+	return func(t *Tab) {
+		t.Ctx = ctx
+		t.Cancel = cancel
+	}
 }

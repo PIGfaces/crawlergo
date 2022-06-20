@@ -3,7 +3,6 @@ package resultsave
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/PIGfaces/crawlergo/pkg/logger"
@@ -60,7 +59,7 @@ func (fs *FileSave) Save(req *model.Request) {
 		logger.Logger.Error("cannot serialization")
 		return
 	}
-	_, err = fs.iow.WriteString(fmt.Sprintf("%s\n", reqResultInfo))
+	_, err = fs.iow.Write(append(reqResultInfo, '\\', 'n'))
 	if err != nil {
 		logger.Logger.Error("cannot write to file")
 	}
