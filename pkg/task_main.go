@@ -249,7 +249,7 @@ func (t *CrawlerTask) Run() {
 */
 func (t *CrawlerTask) addTask2Pool(req *model.Request) {
 	t.taskCountLock.Lock()
-	if t.crawledCount >= t.Config.MaxCrawlCount || req.Depth >= t.Config.CrawDepth {
+	if t.crawledCount >= t.Config.MaxCrawlCount || (t.Config.CrawDepth > 0 && req.Depth >= t.Config.CrawDepth) {
 		// 深度控制
 		t.taskCountLock.Unlock()
 		return

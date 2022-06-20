@@ -59,7 +59,7 @@ func (fs *FileSave) Save(req *model.Request) {
 		logger.Logger.Error("cannot serialization")
 		return
 	}
-	_, err = fs.iow.Write(append(reqResultInfo, '\\', 'n'))
+	_, err = fs.iow.WriteString(string(reqResultInfo) + "\n")
 	if err != nil {
 		logger.Logger.Error("cannot write to file")
 	}

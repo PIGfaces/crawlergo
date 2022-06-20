@@ -6,3 +6,4 @@ result
 internal/.DS_Store
 pkg/.DS_Store
 cmd/crawlergo/*.pprof
+cmd/crawlergo/__debug_bin
