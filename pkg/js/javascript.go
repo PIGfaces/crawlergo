@@ -2,6 +2,7 @@ package js
 
 import (
 	"fmt"
+
 	"github.com/chromedp/cdproto/cdp"
 )
 
@@ -292,33 +293,41 @@ const ObserverJS = `
 (function init_observer_sec_auto_b() {
 	window.dom_listener_func_sec_auto = function (e) {
 		let node = e.target;
-		let nodeListSrc = node.querySelectorAll("[src]");
-		for (let each of nodeListSrc) {
-			if (each.src) {
-				window.addLink(each.src, "DOM");
-				let attrValue = each.getAttribute("src");
-				if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
-					try {
-						eval(attrValue.substring(11));
+		try {
+			let nodeListSrc = node.querySelectorAll("[src]");
+			for (let each of nodeListSrc) {
+				if (each.src) {
+					window.addLink(each.src, "DOM");
+					let attrValue = each.getAttribute("src");
+					if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
+						let jsFuncName = attrValue.substring(11);
+						if (!jsFuncName.includes("void(0)")) {
+								eval(jsFuncName);
+						}
 					}
-					catch {}
 				}
 			}
+		} catch(err) {
+			console.log("error", err, " node :", node, " type: ", typeof node);
 		}
 		
-		let nodeListHref = node.querySelectorAll("[href]");
-		nodeListHref = window.randArr(nodeListHref);
-		for (let each of nodeListHref) {
-			if (each.href) {
-				window.addLink(each.href, "DOM");
-				let attrValue = each.getAttribute("href");
-				if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
-					try {
-						eval(attrValue.substring(11));
+		try {
+			let nodeListHref = node.querySelectorAll("[href]");
+			nodeListHref = window.randArr(nodeListHref);
+			for (let each of nodeListHref) {
+				if (each.href) {
+					window.addLink(each.href, "DOM");
+					let attrValue = each.getAttribute("href");
+					if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
+						let jsFuncName = attrValue.substring(11);
+						if (!jsFuncName.includes("void(0)")) {
+								eval(jsFuncName);
+						}
 					}
-					catch {}
 				}
 			}
+		} catch (err) {
+			console.log("error of nodeListHref", err, " node :", node, " type: ", typeof node);
 		}
 	};
 	document.addEventListener('DOMNodeInserted', window.dom_listener_func_sec_auto, true);
@@ -363,8 +372,9 @@ const TriggerInlineEventJS = `
 			evt.initCustomEvent(event, false, true, null);
 			try {
 				node.dispatchEvent(evt);
+			} catch (err) {
+				console.log("error: ", err)
 			}
-			catch {}
 		}
 	}
 })()
@@ -428,11 +438,15 @@ const TriggerJavascriptProtocol = `
 	for (let node of nodeListHref) {
 		let attrValue = node.getAttribute("href");
 		if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
-			await window.sleep(%f);
-			try {
-				eval(attrValue.substring(11));
+			let jsFuncName = attrValue.substring(11);
+			if (!jsFuncName.includes("void(0)")) {
+				await window.sleep(%f);
+				try {
+					eval(jsFuncName);
+				} catch (err) {
+					console.log("error: ", err)
+				}
 			}
-			catch {}
 		}
 	}
 	let nodeListSrc = document.querySelectorAll("[src]");
@@ -440,11 +454,13 @@ const TriggerJavascriptProtocol = `
 	for (let node of nodeListSrc) {
 		let attrValue = node.getAttribute("src");
 		if (attrValue.toLocaleLowerCase().startsWith("javascript:")) {
-			await window.sleep(%f);
-			try {
-				eval(attrValue.substring(11));
+			let jsFuncName = attrValue.substring(11);
+			if (!jsFuncName.includes("void(0)")) {
+				await window.sleep(%f);
+				try {
+					eval(jsFuncName);
+				} catch {}
 			}
-			catch {}
 		}
 	}
 })()

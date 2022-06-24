@@ -188,3 +188,8 @@ func (u *URL) ParentPath() string {
 		return strings.Join(parts, "/")
 	}
 }
+
+func (u *URL) Copy() *URL {
+	var cpUrl URL = *u
+	return &cpUrl
+}

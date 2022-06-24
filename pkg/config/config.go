@@ -1,9 +1,14 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	mapset "github.com/deckarep/golang-set"
+)
 
 const (
 	DefaultUA               = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.0 Safari/537.36"
+	DefaultPhonUA           = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1"
 	MaxTabsCount            = 10
 	TabRunTimeout           = 20 * time.Second
 	DefaultInputText        = "Crawlergo"
@@ -16,7 +21,16 @@ const (
 	BeforeExitDelay         = 1 * time.Second
 	DefaultEventTriggerMode = EventTriggerAsync
 	MaxCrawlCount           = 200
-	UploadFileSizeLimited   = 10 * 1024 * 1024
+	UploadFileSizeLimited   = 10 * 1024 * 1024 // 上传的文件大小限制
+	StaticReqCnt            = 500              // 静态资源最大请求数
+)
+
+// 请求头
+const (
+	HEAD_UA_KEY      = "User-Agent"
+	HEAD_CookIE_KEY  = "Cookie"
+	HEAD_Host_KEY    = "Host"
+	HEAD_Referer_KEY = "Referer"
 )
 
 // 请求方法
@@ -77,15 +91,18 @@ const (
 	MULTIPART  = "multipart/form-data"
 )
 
-var StaticSuffix = []string{
-	"png", "gif", "jpg", "mp4", "mp3", "mng", "pct", "bmp", "jpeg", "pst", "psp", "ttf",
-	"tif", "tiff", "ai", "drw", "wma", "ogg", "wav", "ra", "aac", "mid", "au", "aiff",
-	"dxf", "eps", "ps", "svg", "3gp", "asf", "asx", "avi", "mov", "mpg", "qt", "rm",
-	"wmv", "m4a", "bin", "xls", "xlsx", "ppt", "pptx", "doc", "docx", "odt", "ods", "odg",
-	"odp", "exe", "zip", "rar", "tar", "gz", "iso", "rss", "pdf", "txt", "dll", "ico",
-	"gz2", "apk", "crt", "woff", "map", "woff2", "webp", "less", "dmg", "bz2", "otf", "swf",
-	"flv", "mpeg", "dat", "xsl", "csv", "cab", "exif", "wps", "m4v", "rmvb",
-}
+var (
+	StaticSuffix = []string{
+		".png", ".gif", ".jpg", ".mp4", ".mp3", ".mng", ".pct", ".bmp", ".jpeg", ".pst", ".psp", ".ttf",
+		".tif", ".tiff", ".ai", ".drw", ".wma", ".ogg", ".wav", ".ra", ".aac", ".mid", ".au", ".aiff",
+		".dxf", ".eps", ".ps", ".svg", ".3gp", ".asf", ".asx", ".avi", ".mov", ".mpg", ".qt", ".rm",
+		".wmv", ".m4a", ".bin", ".xls", ".xlsx", ".ppt", ".pptx", ".doc", ".docx", ".odt", ".ods", ".odg",
+		".odp", ".exe", ".zip", ".rar", ".tar", ".gz", ".iso", ".rss", ".pdf", ".txt", ".dll", ".ico",
+		".gz2", ".apk", ".crt", ".woff", ".map", ".woff2", ".webp", ".less", ".dmg", ".bz2", ".otf", ".swf",
+		".flv", ".mpeg", ".dat", ".xsl", ".csv", ".cab", ".exif", ".wps", ".m4v", ".rmvb",
+	}
+	StaticSuffixSet = mapset.NewSet()
+)
 
 var ScriptSuffix = []string{
 	"php", "asp", "jsp", "asa",
@@ -137,4 +154,10 @@ var InputTextMap = map[string]map[string]interface{}{
 		"keyword": []string{"day", "age", "num", "count"},
 		"value":   "10",
 	},
+}
+
+func init() {
+	for _, suffix := range StaticSuffix {
+		StaticSuffixSet.Add(suffix)
+	}
 }

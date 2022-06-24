@@ -47,9 +47,11 @@ func NewFileSave(fileName string) *FileSave {
 	if err != nil {
 		logger.Logger.Fatal("cannot open file: ", err.Error())
 	}
+	iow := bufio.NewWriter(f)
+	iow.WriteString("[\n")
 	return &FileSave{
 		file: f,
-		iow:  bufio.NewWriter(f),
+		iow:  iow,
 	}
 }
 
@@ -59,7 +61,7 @@ func (fs *FileSave) Save(req *model.Request) {
 		logger.Logger.Error("cannot serialization")
 		return
 	}
-	_, err = fs.iow.WriteString(string(reqResultInfo) + "\n")
+	_, err = fs.iow.WriteString(string(reqResultInfo) + ",\n")
 	if err != nil {
 		logger.Logger.Error("cannot write to file")
 	}
@@ -74,5 +76,10 @@ func isExistFile(path string) bool {
 
 func (fs *FileSave) Close() {
 	fs.iow.Flush()
+	if s, err := fs.file.Seek(-2, os.SEEK_END); err == nil {
+		// 抹去最后一个逗号和\n, 避免读取时解析 json 失败
+		fs.file.Truncate(s)
+	}
+	fs.file.WriteString("]")
 	fs.file.Close()
 }

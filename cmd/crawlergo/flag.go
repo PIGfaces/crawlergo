@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/PIGfaces/crawlergo/pkg/config"
 
 	"github.com/urfave/cli/v2"
@@ -57,9 +55,9 @@ func SetChromePath() *cli.PathFlag {
 
 func SetCustomHeaders() *cli.StringFlag {
 	return &cli.StringFlag{
-		Name:        "custom-headers",
-		Usage:       "add additional `Headers` to each request. The input string will be called json.Unmarshal",
-		Value:       fmt.Sprintf(`{"Spider-Name": "crawlergo", "User-Agent": "%s"}`, config.DefaultUA),
+		Name:  "custom-headers",
+		Usage: "add additional `Headers` to each request. The input string will be called json.Unmarshal",
+		// Value:       fmt.Sprintf(`{"Spider-Name": "crawlergo", "User-Agent": "%s"}`, config.DefaultUA),
 		Destination: &taskConfig.ExtraHeadersString,
 	}
 }

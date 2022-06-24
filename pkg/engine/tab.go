@@ -21,6 +21,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/device"
 	"github.com/gogf/gf/encoding/gcharset"
 )
 
@@ -34,11 +35,13 @@ type Tab struct {
 	LoaderID         string
 	NavNetworkID     string
 	PageCharset      string
+	chromeUA         string // headless 模式打开的 UA 头
 	PageBindings     map[string]interface{}
 	NavDone          chan struct{}
 	FoundRedirection bool
 	DocBodyNodeId    cdp.NodeID
 	config           TabConfig
+	staticReqCntMap  sync.Map // 某些静态资源是必须加载的，这里记录加载的次数
 
 	lock sync.Mutex
 
@@ -69,7 +72,7 @@ func NewTab(optFunc ...TabOptFunc) *Tab {
 	var DOMContentLoadedRun = false
 	tab.NavDone = make(chan struct{})
 	tab.DocBodyNodeId = 0
-
+	tab.staticReqCntMap = sync.Map{}
 	// 设置请求拦截监听
 	chromedp.ListenTarget(tab.Ctx, func(v interface{}) {
 		switch v := v.(type) {
@@ -171,43 +174,53 @@ func waitNavigateDone(ctx context.Context) error {
 	}
 }
 
+func (tab *Tab) getTasks() chromedp.Tasks {
+	task := chromedp.Tasks{
+		runtime.Enable(),
+		// 开启网络层API
+		network.Enable(),
+		// /*
+		// 开启请求拦截API
+		fetch.Enable().WithHandleAuthRequests(true),
+		// 添加回调函数绑定
+		// XSS-Scan 使用的回调
+		runtime.AddBinding("addLink"),
+		runtime.AddBinding("Test"),
+	}
+	if tab.NavigateReq.IsPhoneDevice {
+		task = append(task, chromedp.Emulate(device.IPhoneX))
+	}
+	task = append(task,
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			var err error
+			_, err = page.AddScriptToEvaluateOnNewDocument(js.TabInitJS).Do(ctx)
+			if err != nil {
+				return err
+			}
+			return nil
+		}),
+		// 自定义头
+		network.SetExtraHTTPHeaders(tab.ExtraHeaders),
+		// 执行导航
+		//chromedp.Navigate(tab.NavigateReq.URL.String()),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			_, _, _, err := page.Navigate(tab.NavigateReq.URL.String()).Do(ctx)
+			if err != nil {
+				return err
+			}
+			return waitNavigateDone(ctx)
+		}))
+	return task
+
+}
+
 func (tab *Tab) Start() {
 	logger.Logger.Info("Crawling " + tab.NavigateReq.Method + " " + tab.NavigateReq.URL.String())
 	defer tab.Cancel()
 	if err := chromedp.Run(tab.Ctx,
-		RunWithTimeOut(tab.config.DomContentLoadedTimeout, chromedp.Tasks{
-			//
-			runtime.Enable(),
-			// 开启网络层API
-			network.Enable(),
-			// /*
-			// 开启请求拦截API
-			fetch.Enable().WithHandleAuthRequests(true),
-			// 添加回调函数绑定
-			// XSS-Scan 使用的回调
-			runtime.AddBinding("addLink"),
-			runtime.AddBinding("Test"),
-			// */
-			// 初始化执行JS
-			chromedp.ActionFunc(func(ctx context.Context) error {
-				var err error
-				_, err = page.AddScriptToEvaluateOnNewDocument(js.TabInitJS).Do(ctx)
-				if err != nil {
-					return err
-				}
-				return nil
-			}),
-			network.SetExtraHTTPHeaders(tab.ExtraHeaders),
-			// 执行导航
-			//chromedp.Navigate(tab.NavigateReq.URL.String()),
-			chromedp.ActionFunc(func(ctx context.Context) error {
-				_, _, _, err := page.Navigate(tab.NavigateReq.URL.String()).Do(ctx)
-				if err != nil {
-					return err
-				}
-				return waitNavigateDone(ctx)
-			}),
-		}),
+		RunWithTimeOut(tab.config.DomContentLoadedTimeout,
+			tab.getTasks(),
+		),
 	); err != nil {
 		if err.Error() == "context canceled" {
 			return
@@ -225,7 +238,7 @@ func (tab *Tab) Start() {
 	case <-tab.NavDone:
 		logger.Logger.Debug("all navigation tasks done.")
 	case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
-		logger.Logger.Warn("navigation tasks TIMEOUT.")
+		logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
 	}
 
 	// 等待收集所有链接
@@ -277,46 +290,50 @@ func (tab *Tab) AddResultUrl(method string, _url string, source string) {
 	referer := navUrl.String()
 
 	// 处理Host绑定
-	if host, ok := tab.NavigateReq.Headers["Host"]; ok {
+	if host, ok := tab.NavigateReq.Headers[config.HEAD_Host_KEY]; ok {
 		if host != navUrl.Hostname() && url.Hostname() == host {
 			url, _ = model2.GetUrl(strings.Replace(url.String(), "://"+url.Hostname(), "://"+navUrl.Hostname(), -1), *navUrl)
-			option.Headers["Host"] = host
+			option.Headers[config.HEAD_Host_KEY] = host
 			referer = strings.Replace(navUrl.String(), navUrl.Host, host.(string), -1)
 		}
 	}
 	// 添加Cookie
-	if cookie, ok := tab.NavigateReq.Headers["Cookie"]; ok {
-		option.Headers["Cookie"] = cookie
+	if cookie, ok := tab.NavigateReq.Headers[config.HEAD_CookIE_KEY]; ok {
+		option.Headers[config.HEAD_CookIE_KEY] = cookie
 	}
 
 	// 修正Referer
-	option.Headers["Referer"] = referer
+	option.Headers[config.HEAD_Referer_KEY] = referer
 	for key, value := range tab.ExtraHeaders {
 		option.Headers[key] = value
 	}
 	req := model2.GetRequest(method, url, option)
-	req.Source = source
-	// 继承任务ID
-	req.TaskID = tab.NavigateReq.TaskID
-	// 深度 + 1
-	req.Depth = tab.NavigateReq.Depth + 1
 
-	tab.lock.Lock()
-	tab.ResultList = append(tab.ResultList, &req)
-	tab.lock.Unlock()
+	tab.AddResultRequest(&req, source)
 }
 
 /**
 添加请求到结果列表，拦截请求时处理了Host绑定，此处无需处理
 */
-func (tab *Tab) AddResultRequest(req *model2.Request) {
+func (tab *Tab) AddResultRequest(req *model2.Request, source string) {
 	for key, value := range tab.ExtraHeaders {
 		req.Headers[key] = value
 	}
-	tab.lock.Lock()
 
+	// 若没有 User-Agent，则添加
+	if _, ok := req.Headers[config.HEAD_UA_KEY]; !ok {
+		req.Headers[config.HEAD_UA_KEY] = tab.chromeUA
+	}
+
+	// 请求继承设置
+	req.Source = source
 	// 继承任务ID
 	req.TaskID = tab.NavigateReq.TaskID
+	// 深度 + 1
+	req.Depth = tab.NavigateReq.Depth + 1
+	req.IsPhoneDevice = tab.NavigateReq.IsPhoneDevice
+
+	tab.lock.Lock()
 	tab.ResultList = append(tab.ResultList, req)
 	tab.lock.Unlock()
 }

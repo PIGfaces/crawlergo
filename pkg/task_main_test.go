@@ -93,7 +93,8 @@ func TestXxx(t *testing.T) {
 }
 
 func TestFuzzTabResultList(t *testing.T) {
-	testReqList := getRequest(t, "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/", "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/2/")
+	// testReqList := getRequest(t, "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/1/", "http://testphp.vulnweb.com/Mod_Rewrite_Shop/Details/network-attached-storage-dlink/2/")
+	testReqList := getRequest(t, "http://19.offcn.com/home_19ke/GetNewCourse/")
 	resultList := fuzzTabResultList(testReqList)
 	for _, v := range resultList {
 		t.Log(*v)

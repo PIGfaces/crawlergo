@@ -197,8 +197,11 @@ func (t *CrawlerTask) generateTabTask(req *model.Request) *tabTask {
 开始当前任务
 */
 func (t *CrawlerTask) Run() {
-	defer t.Pool.Release()  // 释放协程池
-	defer t.Browser.Close() // 关闭浏览器
+	defer func() {
+		t.Browser.Close()
+		t.Result.Close()
+		t.Pool.Release() // 释放协程池
+	}()
 
 	if t.Config.PathFromRobots {
 		reqsFromRobots := GetPathsFromRobots(*t.Targets[0])
@@ -227,9 +230,12 @@ func (t *CrawlerTask) Run() {
 			logger.Logger.Debugf("filter req: " + req.URL.RequestURI())
 			continue
 		}
-		initTasks = append(initTasks, req)
 		// 保存有效的请求任务信息
 		t.SaveReqResult(req)
+		phoneReq := req.Copy()
+		phoneReq.IsPhoneDevice = true
+		// 初始化任务时添加手机端请求
+		initTasks = append(initTasks, req, phoneReq)
 	}
 	logger.Logger.Info("filter repeat, target count: ", len(initTasks))
 
@@ -240,7 +246,6 @@ func (t *CrawlerTask) Run() {
 	}
 
 	t.taskWG.Wait()
-	t.Result.Close()
 }
 
 /**
@@ -430,18 +435,20 @@ func (t *CrawlerTask) SaveReqResult(req *model.Request) {
 func (r *Result) Close() {
 	r.resultLock.Lock()
 	defer r.resultLock.Unlock()
-	if r.allDomainSave != nil {
-		r.allDomainSave.Close()
+	wg := sync.WaitGroup{}
+	for _, rs := range []resultsave.ResultSave{
+		r.allDomainSave,
+		r.subDomainSave,
+		r.ReqSave,
+		r.AllReqSave,
+	} {
+		if rs != nil {
+			wg.Add(1)
+			closeFile(rs, &wg)
+		}
 	}
-	if r.subDomainSave != nil {
-		r.subDomainSave.Close()
-	}
-	if r.ReqSave != nil {
-		r.ReqSave.Close()
-	}
-	if r.AllReqSave != nil {
-		r.AllReqSave.Close()
-	}
+	wg.Wait()
+	logger.Logger.Info("close all result file")
 }
 
 func (ct *CrawlerTask) setUploadFileDir(staticPath string) {
@@ -472,21 +479,37 @@ func (ct *CrawlerTask) setUploadFileDir(staticPath string) {
 
 func fuzzTabResultList(result []*model.Request) []*model.Request {
 	resultList := result
+	fuzzTaskWG := sync.WaitGroup{}
+	lock := sync.Mutex{}
 	for _, req := range result {
-		pathList := strings.Split(req.URL.Path, "/")
-		fuzzPaths := make([]string, 0, len(pathList))
-		for i := range pathList {
-			fzp := pathList[0]
-			for j := 1; j < i; j++ {
-				fzp = fmt.Sprintf("%s/%s", fzp, pathList[j])
+		fuzzTaskWG.Add(1)
+		go func(itemReq model.Request) {
+			defer fuzzTaskWG.Done()
+			pathList := strings.Split(itemReq.URL.Path, "/")
+			fuzzPaths := make([]string, 0)
+			for i := range pathList {
+				fzp := pathList[0]
+				for j := 1; j < i; j++ {
+					fzp = fmt.Sprintf("%s/%s", fzp, pathList[j])
+				}
+				uniqueID := tools.StrMd5(fzp)
+				if !fuzzPathSet.Contains(uniqueID) {
+					fuzzPaths = append(fuzzPaths, fzp+"/")
+					fuzzPathSet.Add(uniqueID)
+				}
 			}
-			uniqueID := tools.StrMd5(fzp)
-			if !fuzzPathSet.Contains(uniqueID) {
-				fuzzPaths = append(fuzzPaths, fzp)
-				fuzzPathSet.Add(uniqueID)
-			}
-		}
-		resultList = append(resultList, doFuzz(*req, fuzzPaths)...)
+
+			fuzzResults := doFuzz(itemReq, fuzzPaths)
+			lock.Lock()
+			resultList = append(resultList, fuzzResults...)
+			lock.Unlock()
+		}(*req)
 	}
+	fuzzTaskWG.Wait()
 	return resultList
+}
+
+func closeFile(rs resultsave.ResultSave, wg *sync.WaitGroup) {
+	defer wg.Done()
+	rs.Close()
 }

@@ -21,7 +21,7 @@ func NewDomainSave(domainFile string, domainLimited string) *SubDomainSave {
 
 func (ds *SubDomainSave) Save(req *model.Request) {
 	if !ds.filter(req) {
-		if _, err := ds.iow.WriteString(req.URL.Hostname() + "\n"); err != nil {
+		if _, err := ds.iow.WriteString("\"" + req.URL.Hostname() + "\",\n"); err != nil {
 			logger.Logger.Error("save all domain failed! ", err.Error())
 		}
 	}

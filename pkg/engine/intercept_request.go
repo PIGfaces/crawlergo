@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"io"
 	"net/textproto"
+
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,6 +31,10 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 	ctx := tab.GetExecutor()
 	_req := v.Request
 	// 拦截到的URL格式一定正常 不处理错误
+	// 保存浏览器默认 UA 头
+	if tab.chromeUA == "" {
+		tab.chromeUA, _ = _req.Headers[config.HEAD_UA_KEY].(string)
+	}
 	url, err := model2.GetUrl(_req.URL, *tab.NavigateReq.URL)
 	if err != nil {
 		logger.Logger.Debug("InterceptRequest parse url failed: ", err)
@@ -43,34 +49,42 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 
 	if IsIgnoredByKeywordMatch(req, tab.config.IgnoreKeywords) {
 		_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
-		req.Source = config.FromXHR
-		tab.AddResultRequest(&req)
+		tab.AddResultRequest(&req, config.FromXHR)
 		return
 	}
 
 	tab.HandleHostBinding(&req)
 
 	// 静态资源 全部阻断
-	for _, suffix := range config.StaticSuffix {
-		if strings.HasSuffix(strings.ToLower(url.Path), suffix) {
-			_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
-			req.Source = config.FromStaticRes
-			tab.AddResultRequest(&req)
-			return
+	if config.StaticSuffixSet.Contains(path.Ext(url.Path)) {
+		staticID := tools.StrMd5(url.Path)
+		// 获取静态资源爬取的数量, 并加1
+		value, ok := tab.staticReqCntMap.Load(staticID)
+		if !ok {
+			tab.staticReqCntMap.Store(staticID, 0)
+			value = 0
 		}
+		val := value.(int) + 1
+		tab.staticReqCntMap.Store(staticID, val)
+		// 若单个页面请求当前静态资源的次数超过了阈值，说明这个静态资源必须要加载，否则会有问题
+		if ok && val > config.StaticReqCnt {
+			_ = fetch.ContinueRequest(v.RequestID).Do(ctx)
+		} else {
+			_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
+		}
+		tab.AddResultRequest(&req, config.FromStaticRes)
+		return
 	}
 
 	// 处理导航请求
 	if tab.IsNavigatorRequest(v.NetworkID.String()) {
 		tab.NavNetworkID = v.NetworkID.String()
 		tab.HandleNavigationReq(&req, v)
-		req.Source = config.FromNavigation
-		tab.AddResultRequest(&req)
+		tab.AddResultRequest(&req, config.FromNavigation)
 		return
 	}
 
-	req.Source = config.FromXHR
-	tab.AddResultRequest(&req)
+	tab.AddResultRequest(&req, config.FromXHR)
 	_ = fetch.ContinueRequest(v.RequestID).Do(ctx)
 }
 
@@ -117,9 +131,7 @@ func (tab *Tab) HandleNavigationReq(req *model2.Request, v *fetch.EventRequestPa
 		if err != nil {
 			logger.Logger.Debug(err)
 		}
-		navReq.RedirectionFlag = true
-		navReq.Source = config.FromNavigation
-		tab.AddResultRequest(navReq)
+		tab.AddResultRequest(navReq, config.FromNavigation)
 		// 处理重定向标记
 	} else if navReq.RedirectionFlag && tab.IsTopFrame(v.FrameID.String()) {
 		navReq.RedirectionFlag = false

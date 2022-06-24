@@ -3,8 +3,12 @@ package engine_test
 import (
 	"context"
 	"log"
+	"path"
+	"strings"
 	"testing"
 
+	"github.com/PIGfaces/crawlergo/pkg/config"
+	"github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/chromedp/chromedp"
 	"github.com/stretchr/testify/assert"
 )
@@ -59,4 +63,22 @@ func TestTab(t *testing.T) {
 	err := chromedp.Run(bctx)
 	assert.Nil(t, err)
 
+}
+
+func TestStaticUrl(t *testing.T) {
+	url := "http://www.baidu.com/test/test.png"
+	_UrlMod, err := model.GetUrl(url)
+	assert.Nil(t, err)
+	assert.Equal(t, ".png", path.Ext(_UrlMod.Path))
+	assert.Equal(t, "test.png", path.Base(_UrlMod.Path))
+}
+
+func TestFilterStatic(t *testing.T) {
+	url := "http://www.baidu.com/test/Modifypng"
+	_UrlMod, err := model.GetUrl(url)
+	assert.Nil(t, err)
+	assert.Equal(t, "", path.Ext(_UrlMod.Path))
+	for _, suffix := range config.StaticSuffix {
+		assert.Equal(t, false, strings.HasSuffix(strings.ToLower(_UrlMod.Path), suffix))
+	}
 }

@@ -118,12 +118,10 @@ func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 			fuzzWg: &wg,
 		}
 		wg.Add(1)
-		go func() {
-			err := ants.Submit(task.doRequest)
-			if err != nil {
-				wg.Done()
-			}
-		}()
+		if err := ants.Submit(task.doRequest); err != nil {
+			logger.Logger.Error("[do Fuzz] submit task error: ", err)
+			wg.Done()
+		}
 	}
 
 	wg.Wait()
@@ -136,6 +134,7 @@ func doFuzz(navReq model2.Request, pathList []string) []*model2.Request {
 		req := model2.GetRequest(config.GET, url)
 		req.Source = config.FromFuzz
 		req.TaskID = navReq.TaskID
+		req.Headers = navReq.Headers
 		result = append(result, &req)
 	}
 	return result

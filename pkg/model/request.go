@@ -40,6 +40,7 @@ type Request struct {
 	Proxy           string
 	Depth           int
 	HtmlCode        string
+	IsPhoneDevice   bool
 }
 
 var supportContentType = []string{config.JSON, config.URLENCODED}
@@ -198,4 +199,10 @@ func (req *Request) getContentType() (string, error) {
 		}
 	}
 	return "", errors.New("dont support such content-type:" + contentType)
+}
+
+func (req *Request) Copy() *Request {
+	var newReq Request = *req
+	newReq.URL = req.URL.Copy()
+	return &newReq
 }
