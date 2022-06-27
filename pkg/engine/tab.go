@@ -114,24 +114,16 @@ func NewTab(optFunc ...TabOptFunc) *Tab {
 			go tab.HandleAuthRequired(v)
 
 		// DOMContentLoaded
+		// Loaded
 		// 开始执行表单填充 和 执行DOM节点观察函数
 		// 只执行一次
-		case *page.EventDomContentEventFired:
+		case *page.EventDomContentEventFired, *page.EventLoadEventFired:
 			if DOMContentLoadedRun {
 				return
 			}
 			DOMContentLoadedRun = true
 			tab.WG.Add(1)
 			go tab.AfterDOMRun()
-		// Loaded
-		case *page.EventLoadEventFired:
-			if DOMContentLoadedRun {
-				return
-			}
-			DOMContentLoadedRun = true
-			tab.WG.Add(1)
-			go tab.AfterDOMRun()
-
 		// close Dialog
 		case *page.EventJavascriptDialogOpening:
 			tab.WG.Add(1)

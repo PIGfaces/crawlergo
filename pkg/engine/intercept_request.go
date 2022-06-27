@@ -67,12 +67,12 @@ func (tab *Tab) InterceptRequest(v *fetch.EventRequestPaused) {
 		val := value.(int) + 1
 		tab.staticReqCntMap.Store(staticID, val)
 		// 若单个页面请求当前静态资源的次数超过了阈值，说明这个静态资源必须要加载，否则会有问题
+		tab.AddResultRequest(&req, config.FromStaticRes)
 		if ok && val > config.StaticReqCnt {
 			_ = fetch.ContinueRequest(v.RequestID).Do(ctx)
 		} else {
 			_ = fetch.FailRequest(v.RequestID, network.ErrorReasonBlockedByClient).Do(ctx)
 		}
-		tab.AddResultRequest(&req, config.FromStaticRes)
 		return
 	}
 
