@@ -62,7 +62,10 @@ func GetRequest(method string, URL *URL, options ...Options) Request {
 		if option.PostData != "" {
 			req.PostData = option.PostData
 		}
-	} else {
+	}
+
+	if req.Headers == nil {
+
 		req.Headers = map[string]interface{}{}
 	}
 

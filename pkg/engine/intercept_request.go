@@ -131,6 +131,7 @@ func (tab *Tab) HandleNavigationReq(req *model2.Request, v *fetch.EventRequestPa
 		if err != nil {
 			logger.Logger.Debug(err)
 		}
+		navReq.RedirectionFlag = true
 		tab.AddResultRequest(navReq, config.FromNavigation)
 		// 处理重定向标记
 	} else if navReq.RedirectionFlag && tab.IsTopFrame(v.FrameID.String()) {
