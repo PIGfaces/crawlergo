@@ -91,11 +91,12 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 	// 命令行的参数任务
 	targets = append(targets, MakeTargets(urls, taskConf, postData)...)
 
+	rootDomain := targets[0].URL.RootDomain()
 	if taskConf.OutputJsonPath != "" {
 		taskResult.AllReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_REQUEST_FILE))
 		taskResult.ReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.REQUEST_FILE))
 		taskResult.allDomainSave = resultsave.NewAllDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_DOMAIN_FILE))
-		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), targets[0].URL.RootDomain())
+		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), rootDomain)
 	}
 
 	crawlerTask := CrawlerTask{
@@ -103,7 +104,7 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		Config: &taskConf,
 		smartFilter: filter2.SmartFilter{
 			SimpleFilter: filter2.SimpleFilter{
-				HostLimit: targets[0].URL.Host,
+				HostLimit: rootDomain,
 			},
 		},
 		redisUsecase: CSPEngineuc,
@@ -170,7 +171,7 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 	}
 
 	crawlerTask.Browser = engine2.InitBrowser(taskConf.ChromiumPath, taskConf.IncognitoContext, taskConf.ExtraHeaders, taskConf.Proxy, taskConf.NoHeadless)
-	crawlerTask.RootDomain = targets[0].URL.RootDomain()
+	crawlerTask.RootDomain = rootDomain
 
 	crawlerTask.smartFilter.Init()
 

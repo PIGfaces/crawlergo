@@ -80,16 +80,16 @@ func (s *SimpleFilter) DomainFilter(req *model.Request) bool {
 	if s.UniqueSet == nil {
 		s.UniqueSet = mapset.NewSet()
 	}
-	if req.URL.Host == s.HostLimit || req.URL.Hostname() == s.HostLimit {
+	if req.URL.Host == s.HostLimit || req.URL.Hostname() == s.HostLimit || req.URL.RootDomain() == s.HostLimit {
 		return false
 	}
 	if strings.HasSuffix(s.HostLimit, ":80") && req.URL.Port() == "" && req.URL.Scheme == "http" {
-		if req.URL.Hostname()+":80" == s.HostLimit {
+		if req.URL.Hostname()+":80" == s.HostLimit || req.URL.RootDomain()+":80" == s.HostLimit {
 			return false
 		}
 	}
 	if strings.HasSuffix(s.HostLimit, ":443") && req.URL.Port() == "" && req.URL.Scheme == "https" {
-		if req.URL.Hostname()+":443" == s.HostLimit {
+		if req.URL.Hostname()+":443" == s.HostLimit || req.URL.RootDomain()+":443" == s.HostLimit {
 			return false
 		}
 	}
