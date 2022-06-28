@@ -40,6 +40,7 @@ var cliFlags = []cli.Flag{
 	SetAutoModifyConcurrence(),
 	SetWeight(),
 	SetCrawDepth(),
+	SetAllowSubDomain(),
 }
 
 func SetChromePath() *cli.PathFlag {
@@ -347,5 +348,14 @@ func SetCrawDepth() *cli.IntFlag {
 		Aliases:     []string{"cdph"},
 		Usage:       "setting craw depth, ",
 		Destination: &taskConfig.CrawDepth,
+	}
+}
+
+func SetAllowSubDomain() *cli.BoolFlag {
+	return &cli.BoolFlag{
+		Name:        "allow-sub-domain",
+		Aliases:     []string{"alowsd"},
+		Usage:       "allow craw sub domain",
+		Destination: &taskConfig.AllowSubDomain,
 	}
 }

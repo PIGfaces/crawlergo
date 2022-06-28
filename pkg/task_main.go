@@ -29,7 +29,6 @@ import (
 type (
 	CrawlerTask struct {
 		Browser       *engine2.Browser //
-		RootDomain    string           // 当前爬取根域名 用于子域名收集
 		Targets       []*model.Request // 输入目标
 		Result        *Result          // 最终结果
 		ResultSave    resultsave.ResultSave
@@ -91,12 +90,11 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 	// 命令行的参数任务
 	targets = append(targets, MakeTargets(urls, taskConf, postData)...)
 
-	rootDomain := targets[0].URL.RootDomain()
 	if taskConf.OutputJsonPath != "" {
 		taskResult.AllReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_REQUEST_FILE))
 		taskResult.ReqSave = resultsave.NewFileSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.REQUEST_FILE))
 		taskResult.allDomainSave = resultsave.NewAllDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_DOMAIN_FILE))
-		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), rootDomain)
+		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), targets[0].URL.RootDomain())
 	}
 
 	crawlerTask := CrawlerTask{
@@ -104,7 +102,8 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		Config: &taskConf,
 		smartFilter: filter2.SmartFilter{
 			SimpleFilter: filter2.SimpleFilter{
-				HostLimit: rootDomain,
+				HostLimit: targets[0].URL.Hostname(),
+				RootLimit: targets[0].URL.RootDomain(),
 			},
 		},
 		redisUsecase: CSPEngineuc,
@@ -171,7 +170,6 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 	}
 
 	crawlerTask.Browser = engine2.InitBrowser(taskConf.ChromiumPath, taskConf.IncognitoContext, taskConf.ExtraHeaders, taskConf.Proxy, taskConf.NoHeadless)
-	crawlerTask.RootDomain = rootDomain
 
 	crawlerTask.smartFilter.Init()
 

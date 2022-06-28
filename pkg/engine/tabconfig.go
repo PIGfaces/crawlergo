@@ -3,6 +3,7 @@ package engine
 import (
 	"time"
 
+	"github.com/PIGfaces/crawlergo/pkg/config"
 	taskConf "github.com/PIGfaces/crawlergo/pkg/task"
 )
 
@@ -84,7 +85,11 @@ func WithEncodeURLWithCharset(isEncode bool) TabConfigOptFunc {
 
 func WithTabRunTimeout(duration time.Duration) TabConfigOptFunc {
 	return func(tc *TabConfig) {
-		tc.TabRunTimeout = duration
+		if duration != 0 {
+			tc.TabRunTimeout = duration
+		} else {
+			tc.TabRunTimeout = config.TabRunTimeout
+		}
 	}
 }
 func WithDomContentLoadedTimeout(duration time.Duration) TabConfigOptFunc {

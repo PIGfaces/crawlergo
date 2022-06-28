@@ -30,7 +30,6 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 
 		// 执行路径
-		chromedp.ExecPath(chromiumPath),
 		// 无头模式
 		chromedp.Flag("headless", !noHeadless),
 		// 禁用GPU，不显示GUI
@@ -59,6 +58,9 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 		chromedp.WindowSize(1920, 1080),
 	)
 	// 设置浏览器代理
+	if chromiumPath != "" {
+		opts = append(opts, chromedp.ExecPath(chromiumPath))
+	}
 	if proxy != "" {
 		opts = append(opts, chromedp.ProxyServer(proxy))
 	}
@@ -69,7 +71,9 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 	)
 	// https://github.com/chromedp/chromedp/issues/824#issuecomment-845664441
 	// 如果需要在一个浏览器上创建多个tab，则需要先创建浏览器的上下文，即运行下面的语句
-	chromedp.Run(bctx)
+	if err := chromedp.Run(bctx); err != nil {
+		logger.Logger.Fatal("cannont found brow in Path:", chromiumPath, "error:", err)
+	}
 	bro.Cancel = cancel
 	bro.Ctx = &bctx
 	bro.ExtraHeaders = extraHeaders

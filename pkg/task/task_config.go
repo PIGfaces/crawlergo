@@ -17,6 +17,7 @@ type TaskConfig struct {
 	DomContentLoadedTimeout time.Duration
 	TabRunTimeout           time.Duration     // 单个标签页超时
 	PathByFuzz              bool              // 通过字典进行Path Fuzz
+	AllowSubDomain          bool              // 允许爬取子域名
 	FuzzDictPath            string            //Fuzz目录字典
 	PathFromRobots          bool              // 解析Robots文件找出路径
 	MaxTabsCount            int               // 允许开启的最大标签页数量 即同时爬取的数量

@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -214,24 +215,26 @@ func (tab *Tab) Start() {
 			tab.getTasks(),
 		),
 	); err != nil {
-		if err.Error() == "context canceled" {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			logger.Logger.Error("start chrome error: ")
 			return
 		}
 		logger.Logger.Warn("navigate timeout ", tab.NavigateReq.URL.String())
 	}
 
-	go func() {
-		// 等待所有协程任务结束
-		tab.WG.Wait()
-		tab.NavDone <- struct{}{}
-	}()
+	// go func() {
+	// 	// 等待所有协程任务结束
+	// 	tab.WG.Wait()
+	// 	tab.NavDone <- struct{}{}
+	// }()
 
-	select {
-	case <-tab.NavDone:
-		logger.Logger.Debug("all navigation tasks done.")
-	case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
-		logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
-	}
+	tab.WG.Wait()
+	// select {
+	// case <-tab.NavDone:
+	// 	logger.Logger.Debug("all navigation tasks done.")
+	// case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
+	// 	logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
+	// }
 
 	// 等待收集所有链接
 	logger.Logger.Debug("collectLinks start.")
