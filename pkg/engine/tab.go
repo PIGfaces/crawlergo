@@ -149,10 +149,8 @@ func waitNavigateDone(ctx context.Context) error {
 	tCtx, cancel := context.WithTimeout(ctx, config.DomContentLoadedTimeout)
 	defer cancel()
 	chromedp.ListenTarget(lCtx, func(ev interface{}) {
-		if _, ok := ev.(*page.EventDomContentEventFired); ok {
-			lCancel()
-			close(ch)
-		} else if _, ok := ev.(*page.EventLoadEventFired); ok {
+		switch ev.(type) {
+		case *page.EventDomContentEventFired, *page.EventLoadEventFired:
 			lCancel()
 			close(ch)
 		}
@@ -184,6 +182,7 @@ func (tab *Tab) getTasks() chromedp.Tasks {
 		task = append(task, chromedp.Emulate(device.IPhoneX))
 	}
 	task = append(task,
+		// 初始化执行JS
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var err error
 			_, err = page.AddScriptToEvaluateOnNewDocument(js.TabInitJS).Do(ctx)
@@ -215,26 +214,24 @@ func (tab *Tab) Start() {
 			tab.getTasks(),
 		),
 	); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			logger.Logger.Error("start chrome error: ")
+		if errors.Is(err, context.Canceled) {
 			return
 		}
-		logger.Logger.Warn("navigate timeout ", tab.NavigateReq.URL.String())
+		logger.Logger.Warn("navigate timeout ", tab.NavigateReq.URL.String(), err)
 	}
 
-	// go func() {
-	// 	// 等待所有协程任务结束
-	// 	tab.WG.Wait()
-	// 	tab.NavDone <- struct{}{}
-	// }()
+	go func() {
+		// 等待所有协程任务结束
+		tab.WG.Wait()
+		tab.NavDone <- struct{}{}
+	}()
 
-	tab.WG.Wait()
-	// select {
-	// case <-tab.NavDone:
-	// 	logger.Logger.Debug("all navigation tasks done.")
-	// case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
-	// 	logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
-	// }
+	select {
+	case <-tab.NavDone:
+		logger.Logger.Debug("all navigation tasks done.")
+	case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
+		logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
+	}
 
 	// 等待收集所有链接
 	logger.Logger.Debug("collectLinks start.")

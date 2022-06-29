@@ -96,6 +96,11 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		taskResult.allDomainSave = resultsave.NewAllDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.ALL_DOMAIN_FILE))
 		taskResult.subDomainSave = resultsave.NewDomainSave(fmt.Sprintf("%s/%s", taskConf.OutputJsonPath, config.SUB_DOMAIN_FILE), targets[0].URL.RootDomain())
 	}
+	var rootLimit string
+	if taskConf.AllowSubDomain {
+		// 允许子域名爬取
+		rootLimit = targets[0].URL.RootDomain()
+	}
 
 	crawlerTask := CrawlerTask{
 		Result: taskResult,
@@ -103,7 +108,7 @@ func NewCrawlerTask(urls []string, taskConf taskPkg.TaskConfig, postData string)
 		smartFilter: filter2.SmartFilter{
 			SimpleFilter: filter2.SimpleFilter{
 				HostLimit: targets[0].URL.Hostname(),
-				RootLimit: targets[0].URL.RootDomain(),
+				RootLimit: rootLimit,
 			},
 		},
 		redisUsecase: CSPEngineuc,

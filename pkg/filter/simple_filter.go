@@ -14,6 +14,15 @@ type SimpleFilter struct {
 	RootLimit string
 }
 
+var staticSuffixSet mapset.Set
+
+func init() {
+	staticSuffixSet = mapset.NewSet()
+	for _, val := range []string{".js", ".css", ".json"} {
+		staticSuffixSet.Add(val)
+	}
+}
+
 /**
 需要过滤则返回 true
 */
@@ -59,16 +68,10 @@ func (s *SimpleFilter) StaticFilter(req *model.Request) bool {
 		s.UniqueSet = mapset.NewSet()
 	}
 	// 首先将slice转换成map
-	extMap := map[string]int{}
-	staticSuffix := append(config.StaticSuffix, "js", "css", "json")
-	for _, suffix := range staticSuffix {
-		extMap[suffix] = 1
-	}
-
 	if req.URL.FileExt() == "" {
 		return false
 	}
-	if _, ok := extMap[req.URL.FileExt()]; ok {
+	if config.StaticSuffixSet.Contains(req.URL.FileExt()) || staticSuffixSet.Contains(req.URL.FileExt()) {
 		return true
 	}
 	return false
