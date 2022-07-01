@@ -3,11 +3,14 @@ package pkg
 import (
 	"os"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/PIGfaces/crawlergo/pkg/config"
 	"github.com/PIGfaces/crawlergo/pkg/model"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -100,4 +103,61 @@ func TestFuzzTabResultList(t *testing.T) {
 		t.Log(*v)
 	}
 	assert.Len(t, resultList, 4)
+}
+
+func TestTaskDone(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		t.Log("=====> go func")
+		time.Sleep(time.Second * 5)
+		t.Log("go func done! <<<<========")
+	}()
+	done := func() <-chan struct{} {
+		t.Log("start done func")
+		wg.Wait()
+		// t.Log("=====> wg all wait done")
+		ch := make(chan struct{})
+		defer close(ch)
+		// ch <- struct{}{}
+		return ch
+	}
+	select {
+	case <-time.After(time.Second * 10):
+		t.Log("=====> select after done")
+		return
+	case <-done():
+		t.Log("=====> select default done")
+		return
+	}
+}
+
+func TestCtx(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	subCtx_1, subcancel_1 := context.WithCancel(ctx)
+	subCtx_2, subcancel_2 := context.WithCancel(ctx)
+	// assert.NotEqual(t, subCtx_1, subCtx_2)
+	t.Log(subcancel_1, " sub cancel: ", subcancel_2)
+	t.Log(&subCtx_1, " sub ctx: ", &subCtx_2)
+	go func() {
+		select {
+		case <-subCtx_1.Done():
+			t.Log("subCtx_1 done")
+		case <-time.After(time.Second * 2):
+			t.Error("subCtx_1 timeout")
+		}
+		time.Sleep(time.Second * 5)
+		subcancel_2()
+	}()
+	time.Sleep(time.Second * 1)
+	subcancel_1()
+	select {
+	case <-subCtx_2.Done():
+		t.Error("subCtx_2 done")
+	case <-time.After(time.Second * 3):
+		t.Log("subCtx_2 timeout is success")
+		subcancel_2()
+	}
+	cancel()
 }

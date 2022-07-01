@@ -38,7 +38,6 @@ type Tab struct {
 	PageCharset      string
 	chromeUA         string // headless 模式打开的 UA 头
 	PageBindings     map[string]interface{}
-	NavDone          chan struct{}
 	FoundRedirection bool
 	DocBodyNodeId    cdp.NodeID
 	config           TabConfig
@@ -71,7 +70,6 @@ func NewTab(optFunc ...TabOptFunc) *Tab {
 	}
 
 	var DOMContentLoadedRun = false
-	tab.NavDone = make(chan struct{})
 	tab.DocBodyNodeId = 0
 	tab.staticReqCntMap = sync.Map{}
 	// 设置请求拦截监听
@@ -140,31 +138,6 @@ func NewTab(optFunc ...TabOptFunc) *Tab {
 	return &tab
 }
 
-/**
-
- */
-func waitNavigateDone(ctx context.Context) error {
-	ch := make(chan struct{})
-	lCtx, lCancel := context.WithCancel(ctx)
-	tCtx, cancel := context.WithTimeout(ctx, config.DomContentLoadedTimeout)
-	defer cancel()
-	chromedp.ListenTarget(lCtx, func(ev interface{}) {
-		switch ev.(type) {
-		case *page.EventDomContentEventFired, *page.EventLoadEventFired:
-			lCancel()
-			close(ch)
-		}
-	})
-	select {
-	case <-ch:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-tCtx.Done():
-		return tCtx.Err()
-	}
-}
-
 func (tab *Tab) getTasks() chromedp.Tasks {
 	task := chromedp.Tasks{
 		runtime.Enable(),
@@ -194,21 +167,21 @@ func (tab *Tab) getTasks() chromedp.Tasks {
 		// 自定义头
 		network.SetExtraHTTPHeaders(tab.ExtraHeaders),
 		// 执行导航
-		//chromedp.Navigate(tab.NavigateReq.URL.String()),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			_, _, _, err := page.Navigate(tab.NavigateReq.URL.String()).Do(ctx)
-			if err != nil {
-				return err
-			}
-			return waitNavigateDone(ctx)
-		}))
+		chromedp.Navigate(tab.NavigateReq.URL.String()),
+	)
 	return task
 
 }
 
 func (tab *Tab) Start() {
 	logger.Logger.Info("Crawling " + tab.NavigateReq.Method + " " + tab.NavigateReq.URL.String())
-	defer tab.Cancel()
+	var flag bool
+	defer func() {
+		tab.Cancel()
+		if flag {
+			logger.Logger.Info("超时链接: ", tab.NavigateReq.URL.String(), " 关闭: ", &tab.Ctx)
+		}
+	}()
 	if err := chromedp.Run(tab.Ctx,
 		RunWithTimeOut(tab.config.DomContentLoadedTimeout,
 			tab.getTasks(),
@@ -217,20 +190,24 @@ func (tab *Tab) Start() {
 		if errors.Is(err, context.Canceled) {
 			return
 		}
-		logger.Logger.Warn("navigate timeout ", tab.NavigateReq.URL.String(), err)
+		flag = true
+		logger.Logger.Warn("navigate timeout ", tab.NavigateReq.URL.String(), "  error: ", err)
 	}
 
-	go func() {
-		// 等待所有协程任务结束
+	// 等待导航结束
+	waitDone := func() <-chan struct{} {
+		logger.Logger.Debug("wait navigate done: ", tab.NavigateReq.URL.String())
 		tab.WG.Wait()
-		tab.NavDone <- struct{}{}
-	}()
+		ch := make(chan struct{})
+		defer close(ch)
+		return ch
+	}
 
 	select {
-	case <-tab.NavDone:
-		logger.Logger.Debug("all navigation tasks done.")
 	case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
-		logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
+		logger.Logger.Warn("=======> navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
+	case <-waitDone():
+		logger.Logger.Info("all navigation tasks done. >>>>> ", tab.NavigateReq.URL.String())
 	}
 
 	// 等待收集所有链接

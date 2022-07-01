@@ -13,9 +13,9 @@ import (
 )
 
 type Browser struct {
-	Ctx          *context.Context
+	Ctx          context.Context
 	Cancel       context.CancelFunc
-	tabs         []*context.Context
+	tabs         []context.Context
 	tabCancels   []context.CancelFunc
 	ExtraHeaders map[string]interface{}
 	lock         sync.Mutex
@@ -75,20 +75,20 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 		logger.Logger.Fatal("cannont found brow in Path:", chromiumPath, "error:", err)
 	}
 	bro.Cancel = cancel
-	bro.Ctx = &bctx
+	bro.Ctx = bctx
 	bro.ExtraHeaders = extraHeaders
 	return &bro
 }
 
 func (bro *Browser) NewTab(timeout time.Duration) (context.Context, context.CancelFunc) {
 	bro.lock.Lock()
-	ctx, cancel := chromedp.NewContext(*bro.Ctx)
+	defer bro.lock.Unlock()
+	ctx, cancel := chromedp.NewContext(bro.Ctx)
 	//defer cancel()
 	tCtx, _ := context.WithTimeout(ctx, timeout)
-	bro.tabs = append(bro.tabs, &tCtx)
+	bro.tabs = append(bro.tabs, tCtx)
 	bro.tabCancels = append(bro.tabCancels, cancel)
 	//defer cancel2()
-	bro.lock.Unlock()
 
 	//return bro.Ctx, &cancel
 	return tCtx, cancel
@@ -101,15 +101,15 @@ func (bro *Browser) Close() {
 	}
 
 	for _, ctx := range bro.tabs {
-		err := browser.Close().Do(*ctx)
+		err := browser.Close().Do(ctx)
 		if err != nil {
 			logger.Logger.Debug(err)
 		}
 	}
 
-	err := browser.Close().Do(*bro.Ctx)
+	err := browser.Close().Do(bro.Ctx)
 	if err != nil {
 		logger.Logger.Debug(err)
 	}
-	(bro.Cancel)()
+	bro.Cancel()
 }
