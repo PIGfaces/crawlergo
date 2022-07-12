@@ -212,13 +212,14 @@ func (tab *Tab) ParseResponseURL(v *network.EventResponseReceived) {
 	ctx := tab.GetExecutor()
 	res, err := network.GetResponseBody(v.RequestID).Do(ctx)
 	if err != nil {
-		logger.Logger.Debug("ParseResponseURL ", err)
+		logger.Logger.Debug("ParseResponseURL ", err, " mimeType: ", v.Response.MimeType, " url: ", v.Response.URL)
 		return
 	}
 	resStr := string(res)
 
 	urlRegex := regexp.MustCompile(config.SuspectURLRegex)
 	urlList := urlRegex.FindAllString(resStr, -1)
+	logger.Logger.Debug(v.Response.URL, "  find url num: ", len(urlList))
 	for _, url := range urlList {
 
 		url = url[1 : len(url)-1]
