@@ -15,7 +15,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/google/wire v0.5.0
-	github.com/knq/sysutil v0.0.0-20191005231841-15668db23d08 // indirect
 	github.com/panjf2000/ants/v2 v2.2.2
 	github.com/pkg/errors v0.8.1
 	github.com/shirou/gopsutil v3.21.11+incompatible

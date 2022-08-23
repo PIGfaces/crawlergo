@@ -433,7 +433,6 @@ func (t *CrawlerTask) SaveReqResult(req *model.Request) {
 	if t.Result.ReqSave != nil {
 		t.Result.ReqSave.Save(req)
 	}
-
 }
 
 func (r *Result) Close() {

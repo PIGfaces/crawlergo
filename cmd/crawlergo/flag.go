@@ -356,6 +356,7 @@ func SetAllowSubDomain() *cli.BoolFlag {
 		Name:        "allow-sub-domain",
 		Aliases:     []string{"alowsd"},
 		Usage:       "allow craw sub domain",
+		Value:       false,
 		Destination: &taskConfig.AllowSubDomain,
 	}
 }
