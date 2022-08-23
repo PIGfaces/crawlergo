@@ -168,6 +168,14 @@ func (tab *Tab) getTasks() chromedp.Tasks {
 		network.SetExtraHTTPHeaders(tab.ExtraHeaders),
 		// 执行导航
 		chromedp.Navigate(tab.NavigateReq.URL.String()),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			// 保存网页源码
+			if tab.config.SaveHtmlCode {
+				OutHtmlErr := chromedp.OuterHTML("html", &tab.NavigateReq.HtmlCode, chromedp.ByQuery).Do(ctx)
+				return OutHtmlErr
+			}
+			return nil
+		}),
 	)
 	return task
 
@@ -205,19 +213,18 @@ func (tab *Tab) Start() {
 
 	select {
 	case <-time.After(tab.config.DomContentLoadedTimeout + time.Second*10):
-		logger.Logger.Warn("=======> navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
+		logger.Logger.Warn("navigation tasks TIMEOUT.", tab.NavigateReq.URL.String())
 	case <-waitDone():
-		logger.Logger.Info("all navigation tasks done. >>>>> ", tab.NavigateReq.URL.String())
+		logger.Logger.Info("all navigation tasks done. url: ", tab.NavigateReq.URL.String())
 	}
 
 	// 等待收集所有链接
 	logger.Logger.Debug("collectLinks start.")
 	tab.collectLinkWG.Add(3)
 	go tab.collectLinks()
-	if tab.config.SaveHtmlCode {
+	if !tab.config.SaveHtmlCode {
 		// 获取网页源码
 		tab.collectLinkWG.Add(1)
-		go tab.getHtml()
 	}
 	tab.collectLinkWG.Wait()
 	logger.Logger.Debug("collectLinks end.")

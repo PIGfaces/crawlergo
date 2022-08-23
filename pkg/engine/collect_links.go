@@ -72,18 +72,3 @@ func (tab *Tab) collectCommentLinks() {
 		}
 	}
 }
-
-// getHtml 获取导航请求的 html 源码
-func (tab *Tab) getHtml() {
-	defer tab.collectLinkWG.Done()
-	ctx := tab.GetExecutor()
-	// 收集 object[data] links
-	tCtx, cancel := context.WithTimeout(ctx, time.Second*1)
-	defer cancel()
-
-	var outHtml string
-	if err := chromedp.OuterHTML("html", &outHtml, chromedp.ByQuery).Do(tCtx); err != nil {
-		logger.Logger.Debugf("url: [%s] get html fail! reason: %s", tab.NavigateReq.URL.String(), err.Error())
-	}
-	tab.NavigateReq.HtmlCode = outHtml
-}
