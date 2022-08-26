@@ -222,10 +222,6 @@ func (tab *Tab) Start() {
 	logger.Logger.Debug("collectLinks start.")
 	tab.collectLinkWG.Add(3)
 	go tab.collectLinks()
-	if !tab.config.SaveHtmlCode {
-		// 获取网页源码
-		tab.collectLinkWG.Add(1)
-	}
 	tab.collectLinkWG.Wait()
 	logger.Logger.Debug("collectLinks end.")
 

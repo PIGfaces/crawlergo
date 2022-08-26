@@ -59,8 +59,7 @@ func (tab *Tab) collectCommentLinks() {
 	defer cancel()
 	commentErr := chromedp.Nodes(`//comment()`, &nodes, chromedp.BySearch).Do(tCtxComment)
 	if commentErr != nil {
-		logger.Logger.Debug("get comment nodes err")
-		logger.Logger.Debug(commentErr)
+		logger.Logger.Debug("get comment nodes err: ", commentErr)
 		return
 	}
 	urlRegex := regexp.MustCompile(config.URLRegex)
