@@ -73,7 +73,7 @@ func InitBrowser(chromiumPath string, incognito bool, extraHeaders map[string]in
 	// https://github.com/chromedp/chromedp/issues/824#issuecomment-845664441
 	// 如果需要在一个浏览器上创建多个tab，则需要先创建浏览器的上下文，即运行下面的语句
 	if err := chromedp.Run(bctx); err != nil {
-		logger.Logger.Fatal("cannont found brow in Path:", chromiumPath, "error:", err)
+		logger.Logger.Fatal("open browser failed: [", chromiumPath, "] error: ", err)
 	}
 	bro.Cancel = cancel
 	bro.Ctx = bctx

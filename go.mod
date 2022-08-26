@@ -5,8 +5,8 @@ go 1.12
 replace git.apache.org/thrift.git => github.com/apache/thrift v0.13.0
 
 require (
-	github.com/chromedp/cdproto v0.0.0-20220629234738-4cfc9cdeeb92
-	github.com/chromedp/chromedp v0.8.2
+	github.com/chromedp/cdproto v0.0.0-20220822010834-25fb11339333
+	github.com/chromedp/chromedp v0.8.4
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/go-redis/redis/extra/redisotel v0.3.0
@@ -24,5 +24,5 @@ require (
 	github.com/urfave/cli/v2 v2.0.0
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/net v0.0.0-20210520170846-37e1c6afe023
-	golang.org/x/sys v0.0.0-20220627191245-f75cf1eec38b // indirect
+	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 // indirect
 )
